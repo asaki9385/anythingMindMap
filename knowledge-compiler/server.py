@@ -235,7 +235,7 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
         task.set_stage("building_tree", 45, "正在构建知识树...")
         # All units (PDF + structured text) for metadata
         unit_meta_by_stem = {Path(unit["path"]).stem: unit for unit in all_units}
-        tree_files = _build_trees_from_md(md_files, work_dir, unit_meta_by_stem)
+        tree_files = _build_trees_from_md(md_files, work_dir, unit_meta_by_stem, api_key=deepseek_api_key)
 
         # Add LLM-structured trees (from unstructured text)
         for i, tree in enumerate(llm_trees):
@@ -546,7 +546,7 @@ async def _llm_structure_chunks(units: list[dict], task: TaskProgress, api_key: 
     return trees
 
 
-def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict | None = None) -> list:
+def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict | None = None, api_key: str = '') -> list:
     """Build tree JSONs from markdown files using tree_builder logic."""
     from tree_builder import parse_md_to_nodes, adjust_standalone_levels, build_tree
     from hierarchy_repair import apply_hierarchy_repair
@@ -566,6 +566,15 @@ def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict 
         nodes = adjust_standalone_levels(nodes)
         nodes = apply_hierarchy_repair(nodes)
         tree_children = build_tree(nodes)
+
+        # Validate hierarchy with LLM if API key is available
+        if api_key:
+            try:
+                from tree_builder import validate_and_repair_hierarchy
+                tree_children = validate_and_repair_hierarchy(tree_children, api_key)
+            except Exception as e:
+                print(f"  Hierarchy validation skipped for {filename}: {e}")
+
         tree = {"title": unit_meta.get("unit_title", filename), "children": tree_children}
 
         out_path = os.path.join(tree_dir, f"{filename}_tree.json")
