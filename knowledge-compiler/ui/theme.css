@@ -493,6 +493,97 @@ textarea {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   Highlight Cards & Content Marks
+   ════════════════════════════════════════════════════════════════ */
+
+.highlight-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.highlight-card {
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--accent);
+  background: var(--surface-raised);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.highlight-card:hover {
+  background: var(--surface);
+}
+
+.highlight-card[data-importance="medium"] {
+  border-left-color: var(--accent-secondary);
+}
+
+.highlight-card .hl-type {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  background: var(--tag-accent-bg);
+  color: var(--accent);
+  margin-bottom: var(--sp-1);
+}
+
+.highlight-card[data-importance="medium"] .hl-type {
+  background: var(--tag-teal-bg);
+  color: var(--accent-secondary);
+}
+
+.highlight-card .hl-text {
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--ink-secondary);
+}
+
+.highlight-mark,
+.content-para .highlight-mark {
+  background: rgba(232,168,76,0.15);
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-weight: var(--weight-medium);
+}
+
+[data-theme="light"] .highlight-mark,
+[data-theme="light"] .content-para .highlight-mark {
+  background: rgba(192,122,46,0.1);
+}
+
+.keyword-tag-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.keyword-tag-wrapper .keyword-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-body);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  white-space: nowrap;
+  max-width: 260px;
+  white-space: normal;
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.keyword-tag-wrapper:hover .keyword-tooltip {
+  display: block;
+}
+
+/* ════════════════════════════════════════════════════════════════
    Responsive
    ════════════════════════════════════════════════════════════════ */
 
