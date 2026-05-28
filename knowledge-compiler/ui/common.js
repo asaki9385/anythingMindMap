@@ -98,6 +98,15 @@ function htmlToMarkdown(html) {
   return md;
 }
 
+function markdownToHtml(md) {
+  if (!md) return '';
+  var html = md;
+  html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>');
+  html = html.replace(/\*([\s\S]+?)\*/g, '<i>$1</i>');
+  html = html.replace(/~~([\s\S]+?)~~/g, '<s>$1</s>');
+  return html;
+}
+
 function highlightKeywords(text, keywords) {
   if (!keywords || keywords.length === 0) return text;
   var result = text;
@@ -557,6 +566,7 @@ global.KT = {
   // HTML
   escapeHtml: escapeHtml,
   htmlToMarkdown: htmlToMarkdown,
+  markdownToHtml: markdownToHtml,
   highlightKeywords: highlightKeywords,
   // Content
   formatSummary: formatSummary,
