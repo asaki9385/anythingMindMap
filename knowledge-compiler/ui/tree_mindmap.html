@@ -5,44 +5,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Knowledge Tree - Mind Map</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<link rel="stylesheet" href="theme.css">
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --bg: #0f1117; --bg2: #1a1d27; --bg3: #242836;
-  --text: #e4e4e7; --text2: #a1a1aa; --text3: #71717a;
-  --accent: #6366f1; --accent2: #818cf8;
-  --green: #22c55e; --yellow: #eab308; --orange: #f97316; --red: #ef4444;
-  --border: #2e3345; --radius: 8px;
-}
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  overflow: hidden;
-}
+body { overflow: hidden; }
+
+/* ── Layout ── */
 .container {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
 .header {
-  background: var(--bg2);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 12px 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  padding: 8px 16px;
   z-index: 10;
+  flex-shrink: 0;
 }
+.header-row-1, .header-row-2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.header-row-1 { margin-bottom: 6px; }
 .header h1 {
-  font-size: 18px;
+  font-family: var(--font-serif);
+  font-size: 16px;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Controls ── */
 .controls {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -50,89 +58,59 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
+  white-space: nowrap;
 }
 .control-group label {
   font-size: 13px;
-  color: var(--text3);
-}
-select, button {
-  padding: 6px 12px;
-  background: var(--bg3);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-}
-select:hover, button:hover {
-  border-color: var(--accent);
-  background: rgba(99, 102, 241, 0.1);
-}
-button {
-  background: rgba(99, 102, 241, 0.2);
-  color: var(--accent2);
-  font-weight: 500;
-}
-button:hover {
-  background: rgba(99, 102, 241, 0.3);
+  color: var(--ink-muted);
 }
 .stats {
   font-size: 12px;
-  color: var(--text3);
+  color: var(--ink-muted);
+  flex-shrink: 0;
 }
 #chart {
-  flex: 1;
   width: 100%;
+  height: 100%;
 }
 .loading {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text3);
+  color: var(--ink-muted);
   font-size: 14px;
 }
-.spinner {
-  border: 2px solid var(--border);
-  border-top: 2px solid var(--accent);
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  animation: spin 0.8s linear infinite;
-  margin-right: 12px;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+
+/* ── Info Panel ── */
 .info-panel {
   position: fixed;
   top: 0;
   bottom: 0;
   right: 0;
-  background: var(--bg2);
+  background: var(--surface);
   border-left: 1px solid var(--border);
   border-radius: 0;
   padding: 24px;
   width: 420px;
   max-width: 45vw;
   font-size: 13px;
-  color: var(--text2);
+  color: var(--ink-secondary);
   display: none;
   z-index: 1000;
   overflow-y: auto;
-  box-shadow: -4px 0 32px rgba(0,0,0,0.4);
+  box-shadow: -4px 0 32px var(--shadow-color);
 }
 .info-panel.show { display: block; }
 .info-panel .node-title {
-  color: var(--accent2);
+  font-family: var(--font-serif);
+  color: var(--accent);
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 8px;
 }
 .info-panel .field-label {
-  color: var(--text3);
+  color: var(--ink-muted);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -147,23 +125,36 @@ button:hover {
   margin-top: 4px;
 }
 .info-panel .keyword-tag {
-  background: rgba(99, 102, 241, 0.15);
-  color: var(--accent2);
-  padding: 2px 8px;
-  border-radius: 4px;
+  background: var(--keyword-bg);
+  color: var(--keyword-color);
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
   font-size: 11px;
+  font-weight: 500;
 }
 .info-panel .exam-point {
   margin: 4px 0;
-  padding-left: 8px;
-  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
   font-size: 12px;
   line-height: 1.4;
 }
 .info-panel .exam-meta {
   font-size: 10px;
-  color: var(--text3);
+  color: var(--ink-muted);
   margin-top: 2px;
+}
+.info-panel .caption-item {
+  margin: 4px 0;
+  padding: 4px 8px;
+  background: var(--canvas);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-secondary);
+}
+.info-panel .caption-item b {
+  color: var(--accent-hover);
 }
 .info-panel .close-btn {
   position: absolute;
@@ -171,28 +162,30 @@ button:hover {
   right: 12px;
   background: none;
   border: none;
-  color: var(--text3);
+  color: var(--ink-muted);
   cursor: pointer;
   font-size: 16px;
   padding: 0;
 }
-.info-panel .close-btn:hover { color: var(--text); }
+.info-panel .close-btn:hover { color: var(--ink); }
+
+/* ── Summary & Content ── */
 .sum-para {
   margin: 4px 0;
   text-indent: 1.4em;
   line-height: 1.7;
   font-size: 13px;
-  color: var(--text2);
+  color: var(--ink-secondary);
 }
 .sum-hl {
-  color: var(--accent2);
-  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent-hover);
+  background: var(--keyword-bg);
   padding: 0 2px;
   border-radius: 2px;
   font-weight: 500;
 }
 .sum-ellipsis {
-  color: var(--text3);
+  color: var(--ink-muted);
   margin-left: 2px;
 }
 .sum-noindent {
@@ -202,7 +195,7 @@ button:hover {
   max-width: 300px;
   font-size: 12px;
   line-height: 1.6;
-  color: #a1a1aa;
+  color: var(--tooltip-body);
 }
 .tooltip-summary .sum-para {
   font-size: 12px;
@@ -210,62 +203,622 @@ button:hover {
   text-indent: 1em;
 }
 .tooltip-summary .sum-hl {
-  color: #818cf8;
-  background: rgba(99, 102, 241, 0.15);
+  color: var(--tooltip-title);
+  background: var(--keyword-bg);
 }
 .content-para {
   margin: 6px 0;
   line-height: 1.65;
   font-size: 13px;
-  color: var(--text2);
+  color: var(--ink-secondary);
   text-indent: 1.4em;
 }
 .tooltip-content {
   max-width: 300px;
   font-size: 12px;
   line-height: 1.5;
-  color: #a1a1aa;
+  color: var(--tooltip-body);
 }
 .tooltip-content .content-para {
   font-size: 12px;
   margin: 3px 0;
   text-indent: 1em;
 }
+
+/* ── Inline Editor ── */
+.inline-editor {
+  position: absolute;
+  z-index: 1001;
+  background: var(--surface-raised);
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 180px;
+  outline: none;
+  box-shadow: 0 0 20px var(--focus-ring);
+  caret-color: var(--accent);
+  display: none;
+}
+.inline-editor.active {
+  display: block;
+  animation: editorAppear 0.15s ease-out;
+}
+.inline-editor::selection {
+  background: var(--focus-ring);
+}
+@keyframes editorAppear {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.edit-hint {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tag-accent-bg);
+  border: 1px solid var(--border-accent);
+  color: var(--accent);
+  padding: 6px 16px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  z-index: 1001;
+  pointer-events: none;
+  display: none;
+}
+.edit-hint.active {
+  display: block;
+}
+
+/* ── Theme Toggle ── */
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; background: var(--surface-raised); border: 1px solid var(--border);
+  border-radius: var(--radius-full); cursor: pointer; font-size: 12px; color: var(--ink-secondary);
+  transition: all 0.2s; user-select: none; white-space: nowrap;
+  flex-shrink: 0;
+}
+.theme-toggle:hover { border-color: var(--accent); background: var(--tag-accent-bg); }
+.theme-toggle .icon { font-size: 16px; line-height: 1; }
+.theme-toggle .label { font-size: 12px; }
+
+/* ── Zoom Slider ── */
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+}
+.zoom-control .zoom-icon {
+  font-size: 14px;
+  color: var(--ink-muted);
+  cursor: default;
+  line-height: 1;
+}
+.zoom-control .zoom-label {
+  font-size: 11px;
+  color: var(--ink-muted);
+  min-width: 36px;
+  text-align: center;
+}
+.zoom-control input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100px;
+  height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.zoom-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.zoom-control input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+.zoom-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
+
+/* ── Content Editor ── */
+.content-edit-btn {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: var(--tag-accent-bg);
+  color: var(--accent-hover);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all 0.2s;
+}
+.content-edit-btn:hover {
+  background: var(--keyword-bg);
+  border-color: var(--accent);
+}
+.content-editor-wrap {
+  display: none;
+  margin-top: 6px;
+}
+.content-editor-wrap.active {
+  display: block;
+}
+.content-display.hidden {
+  display: none;
+}
+.content-edit-bar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.content-edit-bar button {
+  padding: 3px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  background: transparent;
+  color: var(--ink-secondary);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  min-width: 28px;
+  transition: all 0.15s;
+}
+.content-edit-bar button:hover {
+  background: var(--tag-accent-bg);
+  color: var(--ink);
+}
+.content-edit-bar button.active {
+  background: var(--keyword-bg);
+  color: var(--accent-hover);
+  border-color: var(--border-accent);
+}
+.content-editable {
+  min-height: 120px;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-secondary);
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.content-editable:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.content-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.content-actions button {
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.content-actions .btn-save {
+  background: var(--keyword-bg);
+  color: var(--accent-hover);
+  border: 1px solid var(--border-accent);
+}
+.content-actions .btn-save:hover {
+  background: var(--tag-accent-bg);
+}
+.content-actions .btn-cancel {
+  background: var(--surface-raised);
+  color: var(--ink-muted);
+  border: 1px solid var(--border);
+}
+.content-actions .btn-cancel:hover {
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+/* ── Tables ── */
+.table-wrapper {
+  margin: 8px 0;
+  overflow-x: auto;
+}
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.md-table th {
+  background: var(--surface-raised);
+  color: var(--accent-hover);
+  font-weight: 600;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.md-table td {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  color: var(--ink-secondary);
+}
+.md-table tr:nth-child(even) td {
+  background: rgba(232, 168, 76, 0.03);
+}
+
+/* ── Formulas ── */
+.block-formula {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
+  text-align: center;
+  overflow-x: auto;
+  font-size: 14px;
+}
+.inline-formula {
+  font-style: italic;
+  color: var(--accent-hover);
+}
+
+/* ── Mermaid ── */
+.mermaid-block {
+  margin: 10px 0;
+  padding: 12px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  text-align: center;
+}
+.mermaid-block svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Search Toggle Button ── */
+.search-toggle-btn {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  z-index: 501;
+  width: 28px;
+  height: 56px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  cursor: pointer;
+  color: var(--ink-secondary);
+  transition: opacity 0.3s ease, background 0.2s;
+  box-shadow: 2px 0 12px var(--shadow-color);
+  writing-mode: vertical-lr;
+  letter-spacing: 2px;
+  font-size: 12px;
+  padding: 0;
+}
+.search-toggle-btn:hover {
+  color: var(--accent-hover);
+  background: var(--surface-raised);
+}
+.search-toggle-btn.shifted {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Search Panel ── */
+.search-panel {
+  position: fixed;
+  top: 52px;
+  bottom: 0;
+  left: 0;
+  width: 340px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  z-index: 500;
+  transform: translateX(0);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 24px var(--shadow-color);
+}
+.search-panel.collapsed {
+  transform: translateX(-340px);
+  box-shadow: none;
+}
+.search-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.search-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.search-collapse-btn {
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.search-collapse-btn:hover {
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+.search-input-wrap {
+  position: relative;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.search-input-wrap input {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-input-wrap input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.search-input-wrap input::placeholder {
+  color: var(--ink-muted);
+}
+.search-clear-btn {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.search-clear-btn:hover {
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.search-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.search-status {
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.search-result-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(232,168,76,0.06);
+  transition: background 0.15s;
+}
+.search-result-item:hover {
+  background: rgba(232,168,76,0.06);
+}
+.search-result-item.active {
+  background: rgba(232,168,76,0.1);
+}
+.search-result-path {
+  font-size: 11px;
+  color: var(--ink-muted);
+  margin-bottom: 3px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+.search-result-path .path-sep {
+  color: var(--border-strong);
+  margin: 0 3px;
+}
+.search-result-title {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.search-highlight {
+  color: var(--accent-hover);
+  background: var(--keyword-bg);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+/* ── Spacing Slider (Horizontal) ── */
+.spacing-slider {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-md);
+  user-select: none;
+  -webkit-user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.spacing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.spacing-label {
+  font-size: 11px;
+  color: var(--ink-muted);
+  min-width: 36px;
+}
+.spacing-val {
+  font-size: 11px;
+  color: var(--ink-muted);
+  min-width: 28px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.spacing-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.spacing-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.spacing-slider input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+.spacing-slider input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>Knowledge Tree Mind Map</h1>
-    <div class="controls">
-      <div class="control-group">
-        <label for="layoutSelect">Layout:</label>
-        <select id="layoutSelect">
-          <option value="LR" selected>Left-Right</option>
-          <option value="RL">Right-Left</option>
-          <option value="TB">Top-Bottom</option>
-          <option value="BT">Bottom-Top</option>
-        </select>
+    <div class="header-row-1">
+      <h1>Knowledge Tree Mind Map</h1>
+      <div class="header-right">
+        <div class="theme-toggle" id="themeToggle" onclick="handleThemeToggle()">
+          <span class="icon" id="themeIcon">🌙</span>
+          <span class="label" id="themeLabel">Dark</span>
+        </div>
+        <div class="zoom-control">
+          <span class="zoom-icon">−</span>
+          <input type="range" id="zoomRange" min="25" max="300" value="100" step="5" />
+          <span class="zoom-icon">+</span>
+          <span class="zoom-label" id="zoomLabel">100%</span>
+        </div>
       </div>
-      <div class="control-group">
-        <label for="expandLevel">Expand:</label>
-        <select id="expandLevel">
-          <option value="1">1</option>
-          <option value="2" selected>2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-        </select>
+    </div>
+    <div class="header-row-2">
+      <div class="controls">
+        <div class="control-group">
+          <label for="layoutSelect">Layout:</label>
+          <select id="layoutSelect">
+            <option value="LR" selected>Left-Right</option>
+            <option value="RL">Right-Left</option>
+            <option value="TB">Top-Bottom</option>
+            <option value="BT">Bottom-Top</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="expandLevel">Expand:</label>
+          <select id="expandLevel">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <button onclick="fitView()">Fit View</button>
+        <button onclick="expandAll()">Expand All</button>
+        <button onclick="collapseAll()">Collapse All</button>
       </div>
-      <button onclick="fitView()">Fit View</button>
-      <button onclick="expandAll()">Expand All</button>
-      <button onclick="collapseAll()">Collapse All</button>
       <div class="stats" id="stats">Loading...</div>
     </div>
   </div>
-  <div id="chart" class="loading">
-    <span class="spinner"></span>
-    <span>Loading knowledge tree...</span>
+  <button class="search-toggle-btn" id="searchToggleBtn" onclick="toggleSearch()" title="Search (Ctrl+F)">🔍</button>
+  <div class="search-panel collapsed" id="searchPanel">
+    <div class="search-header">
+      <span class="search-title">🔍 Search Nodes</span>
+      <button class="search-collapse-btn" onclick="toggleSearch()" title="Collapse (Ctrl+F)">◀</button>
+    </div>
+    <div class="search-input-wrap">
+      <input type="text" id="searchInput" placeholder="Search node titles..." autocomplete="off" oninput="performSearch()">
+      <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display:none;">✕</button>
+    </div>
+    <div class="search-results" id="searchResults">
+      <div class="search-empty">Type to search node titles...</div>
+    </div>
+    <div class="search-status" id="searchStatus"></div>
+  </div>
+  <div id="chartContainer" style="flex:1;position:relative;">
+    <div id="chart" class="loading">
+      <span class="spinner"></span>
+      <span>Loading knowledge tree...</span>
+    </div>
+    <input type="text" class="inline-editor" id="inlineEditor" />
+    <div class="edit-hint" id="editHint">Enter to save &middot; Esc to cancel &middot; Click canvas to confirm</div>
   </div>
   <div class="info-panel" id="infoPanel">
     <button class="close-btn" onclick="closePanel()">&times;</button>
@@ -273,80 +826,69 @@ button:hover {
   </div>
 </div>
 
+<div class="spacing-slider" id="spacingSlider" title="Drag to adjust node spacing">
+  <div class="spacing-row">
+    <label class="spacing-label">Width</label>
+    <input type="range" id="spacingWidth" min="20" max="300" value="100" />
+    <span class="spacing-val" id="spacingWidthVal">100</span>
+  </div>
+  <div class="spacing-row">
+    <label class="spacing-label">Height</label>
+    <input type="range" id="spacingHeight" min="20" max="300" value="100" />
+    <span class="spacing-val" id="spacingHeightVal">100</span>
+  </div>
+</div>
+
+<script src="common.js"></script>
 <script>
+// ── Theme ──
+KT.initTheme();
+
+function handleThemeToggle() {
+  KT.toggleTheme();
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: KT.getTheme() === 'light' ? 'default' : 'dark',
+    securityLevel: 'loose',
+    fontFamily: 'Noto Sans SC, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  });
+  if (chart && treeData) renderChart(currentLayout, currentExpandLevel);
+}
+
+// ── Mermaid Init ──
+mermaid.initialize({
+  startOnLoad: false,
+  theme: KT.getTheme() === 'light' ? 'default' : 'dark',
+  securityLevel: 'loose',
+  fontFamily: 'Noto Sans SC, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+});
+
 let chart = null;
 let treeData = null;
 let allNodes = [];
 let currentLayout = 'LR';
 let currentExpandLevel = 2;
+let widthSpacing = 100;
+let heightSpacing = 100;
+const SPACING_MIN = 20;
+const SPACING_MAX = 300;
+let searchExpanded = false;
 
-// Level color palette
-const LEVEL_COLORS = [
-  '#6366f1', // L0: root
-  '#818cf8', // L1: Part
-  '#22c55e', // L2: chapter
-  '#eab308', // L3: section
-  '#f97316', // L4: topic
-  '#a78bfa'  // L5: leaf
-];
+// Edit state
+let editState = {
+  active: false,
+  nodeData: null,
+  inputEl: null
+};
+let currentDisplayNode = null;
+const API_BASE = window.location.port === '8700' ? '' : 'http://localhost:8700';
 
-function getNodeColor(level) {
-  return LEVEL_COLORS[Math.min(level, LEVEL_COLORS.length - 1)];
-}
-
-function formatSummary(summary, keywords, maxLen) {
-  if (!summary) return '';
-  var text = summary;
-  if (maxLen > 0 && text.length > maxLen) {
-    text = text.substring(0, maxLen) + '…';
-  }
-  var sentences = text.split(/(?<=[。；])/);
-  var groupSize = 3;
-  var html = '';
-  for (var i = 0; i < sentences.length; i += groupSize) {
-    var chunk = sentences.slice(i, i + groupSize).join('');
-    if (keywords && keywords.length > 0) {
-      keywords.forEach(function(kw) {
-        if (kw.length >= 2) {
-          var escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          var regex = new RegExp('(' + escaped + ')', 'g');
-          chunk = chunk.replace(regex, '<span class="sum-hl">$1</span>');
-        }
-      });
-    }
-    html += '<p class="sum-para">' + chunk + '</p>';
-  }
-  return html;
-}
-
-function formatContent(text, keywords, maxLen) {
-  if (!text) return '';
-  var t = text;
-  if (maxLen > 0 && t.length > maxLen) {
-    t = t.substring(0, maxLen) + '…';
-  }
-  var lines = t.split(/\n+/).filter(function(l) { return l.trim(); });
-  if (lines.length === 0) return '';
-  var html = '';
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i].trim();
-    if (keywords && keywords.length > 0) {
-      keywords.forEach(function(kw) {
-        if (kw.length >= 2) {
-          var escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          var regex = new RegExp('(' + escaped + ')', 'g');
-          line = line.replace(regex, '<span class="sum-hl">$1</span>');
-        }
-      });
-    }
-    html += '<p class="content-para">' + line + '</p>';
-  }
-  return html;
-}
-
-function transformNode(node, depth = 0) {
-  const name = node.title || node.name || 'Untitled';
-  const transformed = {
+// ── Tree Transform (page-specific: adds _pathInFile for edit support) ──
+function transformNode(node, depth, pathInFile) {
+  depth = depth || 0;
+  pathInFile = pathInFile || [];
+  var name = node.title || node.name || 'Untitled';
+  var transformed = {
     name: name,
     title: node.title || node.name,
     level: node.level != null ? node.level : depth,
@@ -355,16 +897,23 @@ function transformNode(node, depth = 0) {
     keywords: node.keywords || [],
     exam_points: node.exam_points || [],
     content: node.content || '',
+    mermaid: node.mermaid || '',
+    tables: node.tables || [],
+    captions: node.captions || [],
+    _pathInFile: pathInFile,
     children: []
   };
 
   if (node.children && Array.isArray(node.children) && node.children.length > 0) {
-    transformed.children = node.children.map(child => transformNode(child, depth + 1));
+    transformed.children = node.children.map(function(child, idx) {
+      return transformNode(child, depth + 1, pathInFile.concat([idx]));
+    });
   }
 
   return transformed;
 }
 
+// ── Data Loading ──
 async function loadAllParts() {
   const partFiles = [];
   for (let i = 1; i <= 4; i++) {
@@ -391,7 +940,11 @@ async function loadAllParts() {
 
   const transformedParts = validParts.map((part, idx) => {
     const node = transformNode(part, 1);
-    // If the top-level part has no title, label it
+    node._sourceFile = `Part_${idx + 1}_tree_enhanced.json`;
+    (function tagSource(n) {
+      n._sourceFile = node._sourceFile;
+      if (n.children) n.children.forEach(tagSource);
+    })(node);
     if (!node.title || node.title === 'Part_' + (idx + 1)) {
       node.name = `Part ${idx + 1}`;
       node.title = `Part ${idx + 1}`;
@@ -412,14 +965,11 @@ async function loadAllParts() {
   };
 }
 
-function flattenNodes(node, path, depth = 0) {
-  const currentPath = [...path, node.name];
-  allNodes.push({ node, path: currentPath, depth });
-  if (node.children) {
-    for (const child of node.children) {
-      flattenNodes(child, currentPath, depth + 1);
-    }
-  }
+// Thin wrapper: delegates to KT.flattenNodes, syncs allNodes
+function flattenNodes(node, path, depth) {
+  window._allNodes = [];
+  KT.flattenNodes(node, path, depth);
+  allNodes = window._allNodes;
 }
 
 function countNodes(node) {
@@ -432,9 +982,83 @@ function countNodes(node) {
   return count;
 }
 
+// ── Spacing ──
+var collapsedNodes = new Set();
+
+function getNodeIndexMap(tree) {
+  var map = {};
+  var idx = 0;
+  function walk(node) {
+    var name = node.title || node.name || '';
+    map[name] = idx;
+    idx++;
+    if (node.children) node.children.forEach(walk);
+  }
+  if (Array.isArray(tree)) tree.forEach(walk);
+  else walk(tree);
+  return map;
+}
+
+function initSpacingSlider() {
+  var widthInput = document.getElementById('spacingWidth');
+  var heightInput = document.getElementById('spacingHeight');
+  var widthVal = document.getElementById('spacingWidthVal');
+  var heightVal = document.getElementById('spacingHeightVal');
+
+  chart.on('expand', function(params) {
+    if (params.data && (params.data.name || params.data.title))
+      collapsedNodes.delete(params.data.name || params.data.title);
+  });
+  chart.on('collapse', function(params) {
+    if (params.data && (params.data.name || params.data.title))
+      collapsedNodes.add(params.data.name || params.data.title);
+  });
+
+  function applySpacing() {
+    if (!chart) return;
+    var isHorizontal = currentLayout === 'LR' || currentLayout === 'RL';
+    var sW = (widthSpacing - 100) / 100;
+    var wFactor = 1 - sW;
+    var sH = (heightSpacing - 100) / 100;
+    var hFactor = 1 - sH;
+    chart.setOption({
+      series: [{
+        top: Math.max(0.3, 4 * hFactor) + '%',
+        left: Math.max(0.3, 8 * wFactor) + '%',
+        right: Math.max(0.3, (isHorizontal ? 20 : 8) * wFactor) + '%',
+        bottom: Math.max(0.3, 4 * hFactor) + '%'
+      }]
+    });
+    if (collapsedNodes.size > 0) {
+      var nodeMap = getNodeIndexMap(treeData);
+      requestAnimationFrame(function() {
+        collapsedNodes.forEach(function(name) {
+          var idx = nodeMap[name];
+          if (idx !== undefined) {
+            chart.dispatchAction({ type: 'treeExpandAndCollapse', seriesIndex: 0, dataIndex: idx });
+          }
+        });
+      });
+    }
+  }
+
+  widthInput.addEventListener('input', function() {
+    widthSpacing = parseInt(this.value);
+    widthVal.textContent = widthSpacing;
+    applySpacing();
+  });
+
+  heightInput.addEventListener('input', function() {
+    heightSpacing = parseInt(this.value);
+    heightVal.textContent = heightSpacing;
+    applySpacing();
+  });
+}
+
+// ── Chart Init ──
 async function initChart() {
   const chartContainer = document.getElementById('chart');
-  chart = echarts.init(chartContainer, null, { renderer: 'canvas' });
+  chart = echarts.init(chartContainer, null, { renderer: 'canvas', devicePixelRatio: window.devicePixelRatio * 2 });
 
   try {
     treeData = await loadAllParts();
@@ -447,7 +1071,9 @@ async function initChart() {
     document.getElementById('stats').textContent =
       `Nodes: ${totalNodes} | Parts: ${partCount} | Enhanced: ${enhancedCount}`;
 
+    document.getElementById('searchToggleBtn').style.display = 'flex';
     renderChart(currentLayout, currentExpandLevel);
+    initSpacingSlider();
 
     document.getElementById('layoutSelect').addEventListener('change', (e) => {
       currentLayout = e.target.value;
@@ -460,37 +1086,72 @@ async function initChart() {
     });
 
     chart.on('click', (params) => {
+      if (editState.active) {
+        if (params.componentSubType === 'tree' && params.data !== editState.nodeData) {
+          saveEdit(editState.inputEl.value);
+        }
+        return;
+      }
       if (params.componentSubType === 'tree') {
         showNodeInfo(params.data);
+      }
+    });
+
+    chart.on('dblclick', (params) => {
+      if (params.componentSubType === 'tree') {
+        startEdit(params.data, params.event);
+      }
+    });
+
+    document.getElementById('chartContainer').addEventListener('mousedown', function(e) {
+      if (!editState.active) return;
+      if (e.target === document.getElementById('inlineEditor')) return;
+      saveEdit(editState.inputEl.value);
+    });
+
+    document.getElementById('inlineEditor').addEventListener('keydown', function(e) {
+      if (!editState.active) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveEdit(this.value);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelEdit();
       }
     });
 
     window.addEventListener('resize', () => chart.resize());
 
   } catch (error) {
-    chartContainer.innerHTML = `<div style="color: #ef4444; padding: 24px; font-size: 14px;">
+    chartContainer.innerHTML = `<div style="color: var(--danger); padding: 24px; font-size: 14px;">
       <strong>Error loading data</strong><br/>${error.message}<br/><br/>
-      <span style="color: #71717a;">Make sure you are serving this file via HTTP (e.g. <code>python -m http.server</code>), not opening directly as file://</span>
+      <span style="color: var(--ink-muted);">Make sure you are serving this file via HTTP (e.g. <code>python -m http.server</code>), not opening directly as file://</span>
     </div>`;
   }
 }
 
-function getLabelPosition(layout) {
-  if (layout === 'LR') return 'right';
-  if (layout === 'RL') return 'left';
-  if (layout === 'TB') return 'bottom';
-  return 'top';
-}
-
-function getLeafLabelPosition(layout) {
-  if (layout === 'LR') return 'right';
-  if (layout === 'RL') return 'left';
-  if (layout === 'TB') return 'bottom';
-  return 'top';
-}
-
-function renderChart(layout, expandLevel) {
+// ── Chart Rendering ──
+function renderChart(layout, expandLevel, targetPath) {
   const isHorizontal = layout === 'LR' || layout === 'RL';
+  var ws = (widthSpacing - 100) / 20;
+  var wFactor = 1 - ws * 0.7;
+  var leftMargin = Math.max(0.5, 8 * wFactor);
+  var rightMargin = Math.max(0.5, (isHorizontal ? 20 : 8) * wFactor);
+  var hs = (heightSpacing - 100) / 20;
+  var hFactor = 1 - hs * 0.7;
+  var topMargin = Math.max(0.5, 4 * hFactor);
+  var bottomMargin = Math.max(0.5, 4 * hFactor);
+
+  var data;
+  if (targetPath && targetPath.length > 0) {
+    data = [KT.transformNodeWithPath(treeData, targetPath)];
+  } else {
+    data = [treeData];
+  }
+
+  var themeAccent = KT.getTheme() === 'light' ? '#c07a2e' : '#e8a84c';
+  var lineColor = KT.getTheme() === 'light' ? 'rgba(192, 122, 46, 0.15)' : 'rgba(232, 168, 76, 0.15)';
+  var successColor = KT.getTheme() === 'light' ? 'rgba(58, 138, 80, 0.3)' : 'rgba(78, 184, 104, 0.3)';
 
   const option = {
     backgroundColor: 'transparent',
@@ -498,49 +1159,66 @@ function renderChart(layout, expandLevel) {
       trigger: 'item',
       triggerOn: 'mousemove',
       confine: false,
-      backgroundColor: 'rgba(15, 17, 23, 0.96)',
-      borderColor: 'rgba(99, 102, 241, 0.3)',
-      borderWidth: 1,
-      padding: [12, 16],
-      textStyle: { color: '#e4e4e7', fontSize: 12, lineHeight: 20 },
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      borderWidth: 0,
+      padding: 0,
+      textStyle: { color: 'var(--ink)', fontSize: 12, lineHeight: 20 },
       extraCssText: 'white-space: normal; word-wrap: break-word; overflow-wrap: break-word;',
       formatter: function(params) {
         if (params.componentSubType !== 'tree') return '';
         const d = params.data;
-        let html = `<div style="max-width: 480px; word-wrap: break-word; overflow-wrap: break-word;">`;
-        html += `<div style="font-size:14px;font-weight:700;color:#818cf8;margin-bottom:6px;">${d.name}</div>`;
+        const c = KT.getTooltipColors();
+        let html = `<div style="max-width:480px;word-wrap:break-word;overflow-wrap:break-word;background:${c.bg};border:1px solid ${c.divider};border-radius:8px;padding:16px 20px;">`;
+        html += `<div style="font-size:14px;font-weight:700;color:${c.title};margin-bottom:6px;">${d.name}</div>`;
 
         if (d.level != null) {
-          html += `<span style="font-size:10px;color:#71717a;">Level ${d.level}</span>`;
+          html += `<span style="font-size:10px;color:${c.meta};">Level ${d.level}</span>`;
         }
 
         if (d.summary) {
-          html += `<div class="tooltip-summary" style="margin-top:8px;">${formatSummary(d.summary, d.keywords, 0)}</div>`;
+          html += `<div class="tooltip-summary" style="margin-top:8px;">${KT.formatSummary(d.summary, d.keywords, 0)}</div>`;
         }
 
         if (d.keywords && d.keywords.length > 0) {
           html += `<div style="margin-top:8px;">`;
           html += d.keywords.map(k =>
-            `<span style="display:inline-block;background:rgba(99,102,241,0.12);color:#818cf8;padding:1px 6px;border-radius:3px;font-size:10px;margin:1px 2px;">${k}</span>`
+            `<span style="display:inline-block;background:${c.keywordBg};color:${c.keywordColor};padding:1px 6px;border-radius:3px;font-size:10px;margin:1px 2px;">${k}</span>`
           ).join('');
           html += `</div>`;
         }
 
         if (d.exam_points && d.exam_points.length > 0) {
-          html += `<div style="margin-top:8px;border-top:1px solid rgba(99,102,241,0.15);padding-top:6px;">`;
+          html += `<div style="margin-top:8px;border-top:1px solid ${c.divider};padding-top:6px;">`;
           d.exam_points.forEach(ep => {
-            const freqColor = ep.frequency === '高频' ? '#22c55e' : ep.frequency === '中频' ? '#eab308' : '#71717a';
-            html += `<div style="font-size:11px;margin:3px 0;"><span style="color:${freqColor};">${ep.frequency || ''}</span> <span style="color:#71717a;">[${ep.type || ''}]</span> ${ep.point}</div>`;
+            const freqColor = ep.frequency === '高频' ? 'var(--success)' : ep.frequency === '中频' ? 'var(--warning)' : 'var(--ink-muted)';
+            html += `<div style="font-size:11px;margin:3px 0;"><span style="color:${freqColor};">${ep.frequency || ''}</span> <span style="color:${c.meta};">[${ep.type || ''}]</span> ${ep.point}</div>`;
           });
           html += `</div>`;
         }
 
-        if (d.content && !d.content.startsWith('graph')) {
-          html += `<div class="tooltip-content" style="margin-top:6px;border-top:1px solid rgba(99,102,241,0.15);padding-top:6px;">${formatContent(d.content, d.keywords, 0)}</div>`;
+        if (d.captions && d.captions.length > 0) {
+          html += `<div style="margin-top:6px;border-top:1px solid ${c.divider};padding-top:6px;">`;
+          html += `<div style="font-size:10px;color:${c.meta};margin-bottom:4px;">CHARTS &amp; TABLES</div>`;
+          d.captions.forEach(cap => {
+            html += `<div style="font-size:11px;margin:2px 0;color:${c.body};"><b>${cap.label}</b>: ${cap.text}</div>`;
+          });
+          html += `</div>`;
+        }
+
+        if (d.content) {
+          html += `<div class="tooltip-content" style="margin-top:6px;border-top:1px solid ${c.divider};padding-top:6px;">${KT.formatContent(d.content, d.keywords, 0)}</div>`;
+        }
+
+        if (d.mermaid) {
+          html += `<div style="margin-top:4px;font-size:10px;color:${c.meta};">[Flowchart - click for details]</div>`;
+        }
+        if (d.tables && d.tables.length > 0) {
+          html += `<div style="margin-top:4px;font-size:10px;color:${c.meta};">[${d.tables.length} table(s) - click for details]</div>`;
         }
 
         if (d.children && d.children.length > 0) {
-          html += `<div style="margin-top:6px;font-size:10px;color:#71717a;">${d.children.length} child nodes</div>`;
+          html += `<div style="margin-top:6px;font-size:10px;color:${c.meta};">${d.children.length} child nodes</div>`;
         }
 
         html += `</div>`;
@@ -550,22 +1228,23 @@ function renderChart(layout, expandLevel) {
     series: [
       {
         type: 'tree',
-        data: [treeData],
-        top: '4%',
-        left: isHorizontal ? '8%' : '8%',
-        right: isHorizontal ? '20%' : '8%',
-        bottom: '4%',
+        data: data,
+        top: topMargin + '%',
+        left: leftMargin + '%',
+        right: rightMargin + '%',
+        bottom: bottomMargin + '%',
         orient: layout,
         symbol: 'circle',
         symbolSize: function(value, params) {
           const d = params.data;
+          if (d.symbolSize) return d.symbolSize;
           const level = d.level || 0;
           if (level === 0) return [20, 20];
           if (level === 1) return [14, 14];
           if (level === 2) return [10, 10];
           return [7, 7];
         },
-        initialTreeDepth: expandLevel,
+        initialTreeDepth: (targetPath && targetPath.length > 0) ? -1 : expandLevel,
         expandAndCollapse: true,
         animationDuration: 500,
         animationDurationUpdate: 500,
@@ -574,18 +1253,24 @@ function renderChart(layout, expandLevel) {
         itemStyle: {
           borderWidth: 1.5,
           borderColor: function(params) {
-            return getNodeColor(params.data.level || 0) + '80';
+            if (params.data.itemStyle && params.data.itemStyle.borderColor) {
+              return params.data.itemStyle.borderColor;
+            }
+            return KT.getNodeColor(params.data.level || 0) + '80';
           },
           color: function(params) {
-            return getNodeColor(params.data.level || 0);
+            if (params.data.itemStyle && params.data.itemStyle.color) {
+              return params.data.itemStyle.color;
+            }
+            return KT.getNodeColor(params.data.level || 0);
           }
         },
         label: {
-          position: getLabelPosition(layout),
+          position: KT.getLabelPosition(layout),
           verticalAlign: 'middle',
           align: 'left',
           fontSize: 12,
-          color: '#e4e4e7',
+          color: KT.getChartLabelColor(),
           fontWeight: 500,
           formatter: function(params) {
             const d = params.data;
@@ -597,7 +1282,7 @@ function renderChart(layout, expandLevel) {
           },
           rich: {
             enhanced: {
-              backgroundColor: 'rgba(34, 197, 94, 0.3)',
+              backgroundColor: successColor,
               borderRadius: 3,
               width: 4,
               height: 4
@@ -606,28 +1291,28 @@ function renderChart(layout, expandLevel) {
         },
         leaves: {
           label: {
-            position: getLeafLabelPosition(layout),
+            position: KT.getLeafLabelPosition(layout),
             verticalAlign: 'middle',
             align: 'left',
             fontSize: 11,
-            color: '#a1a1aa'
+            color: KT.getChartLeafLabelColor()
           }
         },
         lineStyle: {
-          color: 'rgba(99, 102, 241, 0.2)',
+          color: lineColor,
           width: 1.5,
           curveness: 0.5
         },
         emphasis: {
           itemStyle: {
-            color: '#fbbf24',
-            borderColor: '#fbbf24',
+            color: themeAccent,
+            borderColor: themeAccent,
             borderWidth: 2,
             shadowBlur: 12,
-            shadowColor: 'rgba(251, 191, 36, 0.3)'
+            shadowColor: themeAccent.replace(')', ', 0.3)').replace('rgb', 'rgba')
           },
           label: {
-            color: '#fbbf24',
+            color: themeAccent,
             fontWeight: 'bold',
             fontSize: 13
           }
@@ -640,18 +1325,20 @@ function renderChart(layout, expandLevel) {
   chart.setOption(option, true);
 }
 
+// ── Info Panel ──
 function showNodeInfo(d) {
   const panel = document.getElementById('infoPanel');
   const content = document.getElementById('infoContent');
+  currentDisplayNode = d;
   let html = `<div class="node-title">${d.name}</div>`;
 
   if (d.level != null) {
-    html += `<span style="font-size:11px;color:var(--text3);">Level ${d.level}</span>`;
+    html += `<span style="font-size:11px;color:var(--ink-muted);">Level ${d.level}</span>`;
   }
 
   if (d.summary) {
     html += `<div class="field-label">Summary</div>`;
-    html += `<div class="summary">${formatSummary(d.summary, d.keywords, 0)}</div>`;
+    html += `<div class="summary">${KT.formatSummary(d.summary, d.keywords, 0)}</div>`;
   }
 
   if (d.keywords && d.keywords.length > 0) {
@@ -664,8 +1351,8 @@ function showNodeInfo(d) {
   if (d.exam_points && d.exam_points.length > 0) {
     html += `<div class="field-label">Exam Points</div>`;
     d.exam_points.forEach(ep => {
-      const freqColor = ep.frequency === '高频' ? 'var(--green)' :
-                         ep.frequency === '中频' ? 'var(--yellow)' : 'var(--text3)';
+      const freqColor = ep.frequency === '高频' ? 'var(--success)' :
+                         ep.frequency === '中频' ? 'var(--warning)' : 'var(--ink-muted)';
       html += `<div class="exam-point">
         ${ep.point}
         <div class="exam-meta">
@@ -675,23 +1362,121 @@ function showNodeInfo(d) {
     });
   }
 
-  if (d.content && d.content.length > 0 && !d.content.startsWith('graph')) {
-    html += `<div class="field-label">Content</div>`;
-    html += `<div>${formatContent(d.content, d.keywords, 0)}</div>`;
+  if (d.captions && d.captions.length > 0) {
+    html += `<div class="field-label">Charts &amp; Tables</div>`;
+    d.captions.forEach(cap => {
+      html += `<div class="caption-item"><b>${cap.label}</b>: ${cap.text}</div>`;
+    });
+  }
+
+  if (d.content && d.content.length > 0) {
+    html += `<div class="field-label">Content <button class="content-edit-btn" id="contentEditBtn" onclick="enterContentEdit()">Edit</button></div>`;
+    html += `<div class="content-display" id="contentDisplay">${KT.formatContent(d.content, d.keywords, 0)}</div>`;
+    html += `<div class="content-editor-wrap" id="contentEditorWrap">`;
+    html += `  <div class="content-edit-bar">`;
+    html += `    <button id="fmtBold" onclick="execFmt('bold')" title="Bold (Ctrl+B)"><b>B</b></button>`;
+    html += `    <button id="fmtItalic" onclick="execFmt('italic')" title="Italic (Ctrl+I)"><i>I</i></button>`;
+    html += `    <button id="fmtStrike" onclick="execFmt('strikethrough')" title="Strikethrough"><s>S</s></button>`;
+    html += `  </div>`;
+    html += `  <div class="content-editable" id="contentEditable" contenteditable="true"></div>`;
+    html += `  <div class="content-actions">`;
+    html += `    <button class="btn-save" onclick="saveContentEdit()">Save</button>`;
+    html += `    <button class="btn-cancel" onclick="cancelContentEdit()">Cancel</button>`;
+    html += `  </div>`;
+    html += `</div>`;
+  }
+
+  if (d.mermaid) {
+    html += KT.renderNodeMermaid(d.mermaid, 'info-mermaid-' + Date.now());
+  }
+
+  if (d.tables && d.tables.length > 0) {
+    html += KT.renderNodeTables(d.tables);
   }
 
   if (d.children && d.children.length > 0) {
-    html += `<div style="margin-top:10px;font-size:11px;color:var(--text3);">${d.children.length} child node(s)</div>`;
+    html += `<div style="margin-top:10px;font-size:11px;color:var(--ink-muted);">${d.children.length} child node(s)</div>`;
   }
 
   content.innerHTML = html;
   panel.classList.add('show');
+  KT.postRenderMathAndMermaid(content);
 }
 
 function closePanel() {
   document.getElementById('infoPanel').classList.remove('show');
+  currentDisplayNode = null;
 }
 
+// ── Content Editor ──
+
+function enterContentEdit() {
+  if (!currentDisplayNode) return;
+  const display = document.getElementById('contentDisplay');
+  const editorWrap = document.getElementById('contentEditorWrap');
+  const editable = document.getElementById('contentEditable');
+  const btn = document.getElementById('contentEditBtn');
+
+  const raw = currentDisplayNode.content || '';
+  editable.innerHTML = KT.escapeHtml(raw).replace(/\n/g, '<br>');
+
+  display.classList.add('hidden');
+  editorWrap.classList.add('active');
+  btn.style.display = 'none';
+  editable.focus();
+}
+
+function cancelContentEdit() {
+  const display = document.getElementById('contentDisplay');
+  const editorWrap = document.getElementById('contentEditorWrap');
+  const btn = document.getElementById('contentEditBtn');
+
+  editorWrap.classList.remove('active');
+  display.classList.remove('hidden');
+  btn.style.display = '';
+}
+
+async function saveContentEdit() {
+  if (!currentDisplayNode) return;
+  const editable = document.getElementById('contentEditable');
+  const newText = editable.innerText.trim();
+
+  currentDisplayNode.content = newText;
+
+  const sourceFile = currentDisplayNode._sourceFile || '';
+  if (sourceFile) {
+    try {
+      const resp = await fetch(`${API_BASE}/api/update-node`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: sourceFile,
+          path: currentDisplayNode._pathInFile || [],
+          title: currentDisplayNode.name || currentDisplayNode.title,
+          content: newText
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        console.warn('Content save failed:', err.error || resp.status);
+      }
+    } catch (e) {
+      console.warn('Content save failed:', e.message);
+    }
+  }
+
+  const display = document.getElementById('contentDisplay');
+  display.innerHTML = KT.formatContent(newText, currentDisplayNode.keywords || [], 0);
+  KT.postRenderMathAndMermaid(display);
+  cancelContentEdit();
+}
+
+function execFmt(command) {
+  document.execCommand(command, false, null);
+  document.getElementById('contentEditable').focus();
+}
+
+// ── View Controls ──
 function fitView() {
   if (!chart) return;
   chart.setOption({}, { replaceMerge: ['series'] });
@@ -711,6 +1496,216 @@ function collapseAll() {
   document.getElementById('expandLevel').value = '1';
   renderChart(currentLayout, 1);
 }
+
+// ── Inline Node Editing ──
+
+function getSourceFile(nodeData) {
+  return nodeData._sourceFile || '';
+}
+
+function startEdit(nodeData, event) {
+  if (editState.active) {
+    saveEdit(editState.inputEl.value);
+  }
+
+  const input = document.getElementById('inlineEditor');
+  const hint = document.getElementById('editHint');
+
+  const container = document.getElementById('chartContainer');
+  const rect = container.getBoundingClientRect();
+  const left = event.clientX - rect.left - 90;
+  const top = event.clientY - rect.top - 14;
+  input.style.left = Math.max(4, left) + 'px';
+  input.style.top = Math.max(4, top) + 'px';
+  input.value = nodeData.name || '';
+  input.classList.add('active');
+  hint.classList.add('active');
+
+  input.focus();
+  input.select();
+
+  editState.active = true;
+  editState.nodeData = nodeData;
+  editState.inputEl = input;
+}
+
+async function saveEdit(newTitle) {
+  if (!editState.active) return;
+
+  newTitle = (newTitle || '').trim();
+  const nodeData = editState.nodeData;
+
+  if (!newTitle || newTitle === nodeData.name) {
+    cleanupEdit();
+    return;
+  }
+
+  nodeData.name = newTitle;
+  nodeData.title = newTitle;
+
+  const sourceFile = getSourceFile(nodeData);
+  if (sourceFile) {
+    try {
+      const resp = await fetch(`${API_BASE}/api/update-node`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: sourceFile,
+          path: nodeData._pathInFile || [],
+          title: newTitle
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        console.warn('Save to server failed:', err.error || resp.status);
+      }
+    } catch (e) {
+      console.warn('Save to server failed:', e.message);
+    }
+  }
+
+  cleanupEdit();
+  renderChart(currentLayout, currentExpandLevel);
+}
+
+function cancelEdit() {
+  if (!editState.active) return;
+  cleanupEdit();
+}
+
+function cleanupEdit() {
+  const input = document.getElementById('inlineEditor');
+  const hint = document.getElementById('editHint');
+  input.classList.remove('active');
+  hint.classList.remove('active');
+  editState.active = false;
+  editState.nodeData = null;
+  editState.inputEl = null;
+}
+
+// ── Search ──
+
+function toggleSearch() {
+  searchExpanded = !searchExpanded;
+  var panel = document.getElementById('searchPanel');
+  var toggleBtn = document.getElementById('searchToggleBtn');
+
+  if (searchExpanded) {
+    panel.classList.remove('collapsed');
+    toggleBtn.classList.add('shifted');
+    document.getElementById('searchInput').focus();
+  } else {
+    panel.classList.add('collapsed');
+    toggleBtn.classList.remove('shifted');
+  }
+}
+
+function performSearch() {
+  var input = document.getElementById('searchInput');
+  var query = input.value.trim();
+  var clearBtn = document.getElementById('searchClearBtn');
+  var resultsEl = document.getElementById('searchResults');
+  var statusEl = document.getElementById('searchStatus');
+
+  if (!query) {
+    clearBtn.style.display = 'none';
+    resultsEl.innerHTML = '<div class="search-empty">Type to search node titles...</div>';
+    statusEl.textContent = '';
+    return;
+  }
+
+  clearBtn.style.display = 'inline-block';
+
+  if (!allNodes || allNodes.length === 0) {
+    resultsEl.innerHTML = '<div class="search-empty">No tree data loaded</div>';
+    statusEl.textContent = '';
+    return;
+  }
+
+  var matches = KT.searchNodes(allNodes, query);
+
+  if (matches.length === 0) {
+    resultsEl.innerHTML = '<div class="search-empty">No matching nodes found</div>';
+    statusEl.textContent = '';
+    return;
+  }
+
+  statusEl.textContent = matches.length + ' node(s) found';
+
+  var html = '';
+  for (var m = 0; m < matches.length; m++) {
+    var match = matches[m];
+    var pathHtml = '';
+    for (var p = 0; p < match.path.length; p++) {
+      if (p > 0) pathHtml += '<span class="path-sep">&#9654;</span>';
+      pathHtml += KT.escapeHtml(match.path[p] || '');
+    }
+
+    var title = match.node.title || match.node.name || '';
+    var titleHtml = KT.highlightSearchMatch(title, query);
+
+    html += '<div class="search-result-item" data-node-index="' + match.index + '" onclick="expandToNode(' + match.index + ')">';
+    html += '<div class="search-result-path">' + pathHtml + '</div>';
+    html += '<div class="search-result-title">' + titleHtml + '</div>';
+    html += '</div>';
+  }
+
+  resultsEl.innerHTML = html;
+}
+
+function expandToNode(nodeIndex) {
+  if (!chart || !treeData || nodeIndex >= allNodes.length) return;
+
+  var targetPath = allNodes[nodeIndex].path;
+
+  var items = document.querySelectorAll('.search-result-item');
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.remove('active');
+  }
+  var activeItem = document.querySelector('.search-result-item[data-node-index="' + nodeIndex + '"]');
+  if (activeItem) activeItem.classList.add('active');
+
+  renderChart(currentLayout, -1, targetPath);
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchClearBtn').style.display = 'none';
+  document.getElementById('searchResults').innerHTML = '<div class="search-empty">Type to search node titles...</div>';
+  document.getElementById('searchStatus').textContent = '';
+  if (chart && treeData) {
+    renderChart(currentLayout, currentExpandLevel);
+  }
+}
+
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    if (treeData) {
+      e.preventDefault();
+      if (!searchExpanded) toggleSearch();
+      document.getElementById('searchInput').focus();
+      document.getElementById('searchInput').select();
+    }
+  }
+  if (e.key === 'Escape' && searchExpanded) {
+    toggleSearch();
+  }
+});
+
+// ── Zoom Slider ──
+let currentZoom = 1;
+function updateZoom(zoom) {
+  currentZoom = zoom;
+  const container = document.getElementById('chartContainer');
+  container.style.transform = `scale(${zoom})`;
+  container.style.transformOrigin = 'center center';
+  container.style.transition = 'transform 0.15s ease';
+  document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+  document.getElementById('zoomRange').value = Math.round(zoom * 100);
+}
+document.getElementById('zoomRange').addEventListener('input', function(e) {
+  updateZoom(parseInt(e.target.value) / 100);
+});
 
 window.addEventListener('DOMContentLoaded', initChart);
 </script>
