@@ -105,6 +105,7 @@
   --tag-danger-bg: rgba(232,84,84,0.15);
   --tag-success-bg: rgba(78,184,104,0.15);
   --focus-ring: rgba(232,168,76,0.15);
+  --highlight-bg: rgba(232,168,76,0.15);
 }
 
 /* ── Light Mode ── */
@@ -158,6 +159,7 @@
   --tag-danger-bg: rgba(196,64,64,0.1);
   --tag-success-bg: rgba(58,138,80,0.1);
   --focus-ring: rgba(192,122,46,0.15);
+  --highlight-bg: rgba(192,122,46,0.1);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -511,8 +513,11 @@ textarea {
   transition: background var(--duration-fast) var(--ease-out);
 }
 
-.highlight-card:hover {
+.highlight-card:hover,
+.highlight-card:focus-visible {
   background: var(--surface);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .highlight-card[data-importance="medium"] {
@@ -541,17 +546,11 @@ textarea {
   color: var(--ink-secondary);
 }
 
-.highlight-mark,
-.content-para .highlight-mark {
-  background: rgba(232,168,76,0.15);
+.highlight-mark {
+  background: var(--highlight-bg);
   padding: 1px 3px;
   border-radius: 2px;
   font-weight: var(--weight-medium);
-}
-
-[data-theme="light"] .highlight-mark,
-[data-theme="light"] .content-para .highlight-mark {
-  background: rgba(192,122,46,0.1);
 }
 
 .keyword-tag-wrapper {
@@ -560,7 +559,6 @@ textarea {
 }
 
 .keyword-tag-wrapper .keyword-tooltip {
-  display: none;
   position: absolute;
   bottom: calc(100% + 6px);
   left: 50%;
@@ -571,16 +569,21 @@ textarea {
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
-  white-space: nowrap;
   max-width: 260px;
   white-space: normal;
   box-shadow: var(--shadow-md);
   z-index: 10;
   pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--duration-fast) var(--ease-out),
+              visibility var(--duration-fast) var(--ease-out);
 }
 
-.keyword-tag-wrapper:hover .keyword-tooltip {
-  display: block;
+.keyword-tag-wrapper:hover .keyword-tooltip,
+.keyword-tag-wrapper:focus-within .keyword-tooltip {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* ════════════════════════════════════════════════════════════════
