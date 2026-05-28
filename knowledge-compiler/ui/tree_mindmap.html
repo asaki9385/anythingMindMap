@@ -1170,7 +1170,7 @@ function renderChart(layout, expandLevel, targetPath) {
       borderWidth: 0,
       padding: 0,
       textStyle: { color: 'var(--ink)', fontSize: 12, lineHeight: 20 },
-      extraCssText: 'white-space: normal; word-wrap: break-word; overflow-wrap: break-word;',
+      extraCssText: 'white-space: normal; word-wrap: break-word; overflow-wrap: break-word; backface-visibility: hidden; -webkit-font-smoothing: antialiased;',
       formatter: function(params) {
         if (params.componentSubType !== 'tree') return '';
         const d = params.data;
@@ -1435,7 +1435,7 @@ function enterContentEdit() {
   const btn = document.getElementById('contentEditBtn');
 
   const raw = currentDisplayNode.content || '';
-  editable.innerHTML = KT.escapeHtml(raw).replace(/\n/g, '<br>');
+  editable.innerHTML = KT.markdownToHtml(raw).replace(/\n/g, '<br>');
 
   display.classList.add('hidden');
   editorWrap.classList.add('active');
@@ -1456,7 +1456,7 @@ function cancelContentEdit() {
 async function saveContentEdit() {
   if (!currentDisplayNode) return;
   const editable = document.getElementById('contentEditable');
-  const newText = editable.innerText.trim();
+  const newText = KT.htmlToMarkdown(editable.innerHTML).trim();
 
   currentDisplayNode.content = newText;
 
