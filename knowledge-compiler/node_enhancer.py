@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # 配置
 # ────────────────────────────────────────────
 
-OPENAI_API_KEY  = os.environ.get("OPENAI_API_KEY", "sk-7ef0ecb0da964eb6a8e331cbf952e9a1")
+OPENAI_API_KEY  = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = "https://api.deepseek.com/chat/completions"
 MODEL           = "deepseek-v4-flash"
 
@@ -215,6 +215,14 @@ def build_prompt(node: dict, subject_config: dict, context_text: str,
     if surrounding_ctx:
         ctx_block = f"\n## 上下文衔接\n{surrounding_ctx}\n"
 
+    content_len = len(context_text)
+    if content_len < 500:
+        summary_guide = "50-80字，提炼核心论点和关键概念名称"
+    elif content_len > 1000:
+        summary_guide = "150-200字，涵盖核心论点、关键细节和概念名称"
+    else:
+        summary_guide = "100-150字，抓住核心论点和关键细节"
+
     return f"""你是{subject_config['name']}学科专家，专为{subject_config['exam']}备考服务。
 
 ## 知识节点
@@ -230,19 +238,29 @@ def build_prompt(node: dict, subject_config: dict, context_text: str,
 ## 输出要求
 严格输出JSON，不要输出任何其他内容:
 {{
-  "summary": "100-150字核心概括，兼顾内容主旨、层级位置和前后逻辑",
-  "keywords": ["词1", "词2", "词3", "词4", "词5"],
+  "summary": "{summary_guide}。避免'本章介绍了...'这类空话，必须包含具体概念名称",
+  "keywords": [
+    {{"term": "核心术语", "context": "该术语在本文中的含义或作用，一句话说明"}}
+  ],
+  "highlights": [
+    {{"text": "从原文中提取的关键片段（20-60字）", "importance": "high", "type": "definition/theory/argument/example/formula/method"}}
+  ],
   "exam_points": [
     {{"point": "考点描述", "type": "选择题/材料分析题/论述题/阅读理解题", "frequency": "高频/中频/低频"}}
   ],
+  "mermaid": "graph TD\\n    A[概念] --> B[特征]\\n    A --> C[分类] (可选，适合用流程图表达时生成，否则留空字符串)",
+  "tables": ["| 分类 | 特点 | 示例 |\\n|------|------|------|\\n| ... | ... | ... |" ],
   "node_role": "chapter/section/knowledge_point/concept/method/case/comparison/bridge/outline/explanation",
   "structure_hint": "总分/并列/递进/对比/因果/时间线/桥接"
 }}
 - summary重点: {document_profile['summary_focus']}
-- keywords重点: {document_profile['keyword_focus']}
+- keywords重点: {document_profile['keyword_focus']}。每个关键词必须是文中的核心术语，附带一句话context解释。输出3-6个对象
+- highlights: 从原文中提取3-8个关键片段，每个20-60字。importance: high=必须掌握，medium=重要。type标注片段类型
 - exam_points重点: {document_profile['exam_focus']}
-- keywords: 3-6个核心词，避免空泛词
 - exam_points: 0-3个；如果内容明显不是考试资料，也允许输出空数组
+- mermaid: 如果该知识点适合用流程图/思维导图表达（如分类关系、因果链、发展脉络），生成mermaid flowchart代码（使用graph TD或graph LR），否则输出空字符串""。中文节点文本不要加引号，直接写 A[教育的定义]
+- tables: 如果该知识点适合用表格呈现（如多维对比、分类汇总、属性列举），生成markdown表格字符串数组，否则输出空数组[]。表格使用markdown管道符格式
+- mermaid和tables的内容必须是该节点本身的知识，不要重复summary
 - structure_hint要反映本节点更适合如何组织呈现
 - summary中如果该节点位于章节开头或结尾，应体现与前后内容的逻辑过渡"""
 
@@ -297,7 +315,7 @@ async def enhance_one(client: httpx.AsyncClient, node: dict,
         prompt = build_prompt(node, SUBJECT_CONFIG, get_context_text(node), surrounding_ctx)
         payload = {
             "model": MODEL,
-            "max_tokens": 600,
+            "max_tokens": 1500,
             "temperature": 0.3,
             "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": prompt}]
@@ -323,6 +341,9 @@ async def enhance_one(client: httpx.AsyncClient, node: dict,
             node['summary']     = result.get('summary', '')
             node['keywords']    = result.get('keywords', [])
             node['exam_points'] = result.get('exam_points', [])
+            node['mermaid']     = result.get('mermaid', '') or ''
+            node['tables']      = result.get('tables', []) or []
+            node['highlights']  = result.get('highlights', []) or []
             print(f"  OK [L{node['level']}] {node['title'][:40]}")
 
         except json.JSONDecodeError:
