@@ -2155,7 +2155,7 @@ function enterContentEdit() {
   var btn = document.getElementById('contentEditBtn');
 
   var raw = currentDisplayNode.content || '';
-  editable.innerHTML = KT.markdownToHtml(raw).replace(/\n/g, '<br>');
+  editable.innerHTML = KT.markdownToHtml(KT.escapeHtml(raw)).replace(/\n/g, '<br>');
 
   display.classList.add('hidden');
   editorWrap.classList.add('active');
