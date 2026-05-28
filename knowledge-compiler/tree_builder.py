@@ -477,22 +477,33 @@ def validate_and_repair_hierarchy(roots, api_key):
         # Handle both direct array and {"corrections": [...]} format
         corrections = result if isinstance(result, list) else result.get("corrections", result.get("repairs", []))
 
-        # Apply corrections
+        # Apply corrections to a deep copy to preserve original on failure
+        import copy
+        roots_copy = copy.deepcopy(roots)
+        # Re-detect anomalies on the copy to get mutable references
+        unique_copy = []
+        seen_copy = set()
+        for a in _detect_hierarchy_anomalies(roots_copy):
+            key = (a['title'], a['level'])
+            if key not in seen_copy:
+                seen_copy.add(key)
+                unique_copy.append(a)
+        unique_copy = unique_copy[:30]
+
         fixed = 0
         for c in corrections:
             idx = c.get('idx')
             new_level = c.get('correct_level')
-            if idx is not None and new_level and 1 <= new_level <= 5 and idx < len(unique):
-                a = unique[idx]
+            if idx is not None and new_level and 1 <= new_level <= 5 and idx < len(unique_copy):
+                a = unique_copy[idx]
                 if new_level != a['level']:
                     a['node']['level'] = new_level
                     fixed += 1
 
         if fixed > 0:
-            print(f"  Hierarchy: fixed {fixed}/{len(unique)} anomalies")
-            # Rebuild tree with corrected levels
+            print(f"  Hierarchy: fixed {fixed}/{len(unique_copy)} anomalies")
             flat = []
-            for root in roots:
+            for root in roots_copy:
                 flat.extend(_flatten_for_rebuild(root))
             roots = build_tree(flat)
 
@@ -504,8 +515,9 @@ def validate_and_repair_hierarchy(roots, api_key):
 
 def _flatten_for_rebuild(node, parent_level=0):
     """Flatten tree back to node list for rebuild_tree."""
-    result = [{'title': node['title'], 'level': node['level'],
-               'content': node.get('content', ''), 'children': [], 'captions': node.get('captions', [])}]
+    flat_node = {k: v for k, v in node.items() if k != 'children'}
+    flat_node['children'] = []
+    result = [flat_node]
     for child in node.get('children', []):
         result.extend(_flatten_for_rebuild(child, node['level']))
     return result
