@@ -365,7 +365,10 @@ body { overflow: hidden; }
   overflow-y: auto;
   box-shadow: -4px 0 32px var(--shadow-color);
 }
-.info-panel.show { display: block; }
+.info-panel.show {
+  display: block;
+  animation: slideInRight 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
 .info-panel .node-title {
   font-family: var(--font-serif);
   color: var(--accent);
@@ -793,6 +796,9 @@ body { overflow: hidden; }
   flex-direction: column;
   box-shadow: 4px 0 24px var(--shadow-color);
 }
+.search-panel:not(.collapsed) {
+  animation: slideInLeft 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
 .search-panel.collapsed {
   transform: translateX(-340px);
   box-shadow: none;
@@ -1152,7 +1158,7 @@ body { overflow: hidden; }
         <button class="search-collapse-btn" onclick="toggleSearch()" title="Collapse (Ctrl+F)">◀</button>
       </div>
       <div class="search-input-wrap">
-        <input type="text" id="searchInput" placeholder="Search node titles..." autocomplete="off" oninput="performSearch()">
+        <input type="text" id="searchInput" placeholder="Search node titles... (Ctrl+F)" autocomplete="off" oninput="performSearch()">
         <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display:none;">✕</button>
       </div>
       <div class="search-results" id="searchResults">
@@ -1167,7 +1173,7 @@ body { overflow: hidden; }
   </div>
 
   <div class="info-panel" id="infoPanel">
-    <button class="close-btn" onclick="closePanel()">&times;</button>
+    <button class="close-btn" onclick="closePanel()" title="Close (Esc)">&times;</button>
     <div id="infoContent"></div>
   </div>
 </div>
@@ -2265,8 +2271,12 @@ document.addEventListener('keydown', function(e) {
       document.getElementById('searchInput').select();
     }
   }
-  if (e.key === 'Escape' && searchExpanded) {
-    toggleSearch();
+  if (e.key === 'Escape') {
+    if (document.getElementById('infoPanel').classList.contains('show')) {
+      closePanel();
+    } else if (searchExpanded) {
+      toggleSearch();
+    }
   }
 });
 
