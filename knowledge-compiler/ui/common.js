@@ -79,8 +79,9 @@ function highlightKeywords(text, keywords) {
   if (!keywords || keywords.length === 0) return text;
   var result = text;
   keywords.forEach(function(kw) {
-    if (kw.length >= 2) {
-      var escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var term = (typeof kw === 'object' && kw.term) ? kw.term : kw;
+    if (term.length >= 2) {
+      var escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       var regex = new RegExp('(' + escaped + ')', 'g');
       result = result.replace(regex, '<span class="sum-hl">$1</span>');
     }
@@ -209,8 +210,34 @@ function renderNodeTables(tables) {
   return html;
 }
 
+function renderHighlights(highlights) {
+  if (!highlights || highlights.length === 0) return '';
+  var typeLabels = {
+    'definition': 'Definition',
+    'theory': 'Theory',
+    'argument': 'Argument',
+    'example': 'Example',
+    'formula': 'Formula',
+    'method': 'Method'
+  };
+  var html = '<div class="field-label">Highlights</div>';
+  html += '<div class="highlight-list">';
+  highlights.forEach(function(hl, idx) {
+    var importance = hl.importance || 'medium';
+    var typeLabel = typeLabels[hl.type] || hl.type || '';
+    html += '<div class="highlight-card" data-importance="' + escapeHtml(importance) + '" data-hl-idx="' + idx + '">';
+    if (typeLabel) {
+      html += '<span class="hl-type">' + escapeHtml(typeLabel) + '</span><br>';
+    }
+    html += '<span class="hl-text">' + escapeHtml(hl.text) + '</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
 var _mermaidCounter = 0;
-function formatContent(text, keywords, maxLen) {
+function formatContent(text, keywords, maxLen, highlights) {
   if (!text) return '';
   var t = text;
   if (maxLen > 0 && t.length > maxLen) {
@@ -282,11 +309,24 @@ function formatContent(text, keywords, maxLen) {
       continue;
     }
     var processed = highlightKeywords(escapeHtml(line), keywords);
+    processed = applyHighlights(processed, highlights);
     processed = renderInlineFormulas(processed);
     html += '<p class="content-para">' + processed + '</p>';
     i++;
   }
   return html;
+}
+
+function applyHighlights(text, highlights) {
+  if (!highlights || highlights.length === 0) return text;
+  var result = text;
+  highlights.forEach(function(hl, idx) {
+    if (!hl.text || hl.text.length < 6) return;
+    var escaped = hl.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var regex = new RegExp('(' + escaped + ')', 'g');
+    result = result.replace(regex, '<span class="highlight-mark" data-hl-idx="' + idx + '" data-hl-text="' + escapeHtml(hl.text) + '">$1</span>');
+  });
+  return result;
 }
 
 async function postRenderMathAndMermaid(container) {
@@ -501,6 +541,8 @@ global.KT = {
   renderHtmlTable: renderHtmlTable,
   renderNodeMermaid: renderNodeMermaid,
   renderNodeTables: renderNodeTables,
+  renderHighlights: renderHighlights,
+  applyHighlights: applyHighlights,
   postRenderMathAndMermaid: postRenderMathAndMermaid,
   // Tree
   transformNode: transformNode,
