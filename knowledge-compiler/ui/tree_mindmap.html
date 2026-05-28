@@ -1347,10 +1347,21 @@ function showNodeInfo(d) {
     html += `<div class="summary">${KT.formatSummary(d.summary, d.keywords, 0)}</div>`;
   }
 
+  if (d.highlights && d.highlights.length > 0) {
+    html += KT.renderHighlights(d.highlights);
+  }
+
   if (d.keywords && d.keywords.length > 0) {
     html += `<div class="field-label">Keywords</div>`;
     html += `<div class="keywords">`;
-    html += d.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join('');
+    html += d.keywords.map(function(k) {
+      if (typeof k === 'object' && k.term) {
+        return '<span class="keyword-tag-wrapper"><span class="keyword-tag">' + KT.escapeHtml(k.term) + '</span>'
+          + (k.context ? '<span class="keyword-tooltip">' + KT.escapeHtml(k.context) + '</span>' : '')
+          + '</span>';
+      }
+      return '<span class="keyword-tag">' + KT.escapeHtml(k) + '</span>';
+    }).join('');
     html += `</div>`;
   }
 
@@ -1377,7 +1388,7 @@ function showNodeInfo(d) {
 
   if (d.content && d.content.length > 0) {
     html += `<div class="field-label">Content <button class="content-edit-btn" id="contentEditBtn" onclick="enterContentEdit()">Edit</button></div>`;
-    html += `<div class="content-display" id="contentDisplay">${KT.formatContent(d.content, d.keywords, 0)}</div>`;
+    html += `<div class="content-display" id="contentDisplay">${KT.formatContent(d.content, d.keywords, 0, d.highlights)}</div>`;
     html += `<div class="content-editor-wrap" id="contentEditorWrap">`;
     html += `  <div class="content-edit-bar">`;
     html += `    <button id="fmtBold" onclick="execFmt('bold')" title="Bold (Ctrl+B)"><b>B</b></button>`;
