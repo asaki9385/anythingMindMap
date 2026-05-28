@@ -460,7 +460,7 @@ function highlightSearchMatch(title, query) {
 function showToast(msg) {
   var toast = document.getElementById('toast');
   if (!toast) return;
-  toast.innerHTML = msg.replace(/\n/g, '<br>');
+  toast.innerHTML = escapeHtml(msg).replace(/\n/g, '<br>');
   toast.classList.add('show');
   setTimeout(function() { toast.classList.remove('show'); }, 5000);
 }
