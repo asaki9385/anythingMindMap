@@ -317,6 +317,7 @@ function formatContent(text, keywords, maxLen, highlights) {
   return html;
 }
 
+// Note: `text` must be HTML-escaped before calling (formatContent does this)
 function applyHighlights(text, highlights) {
   if (!highlights || highlights.length === 0) return text;
   var result = text;
