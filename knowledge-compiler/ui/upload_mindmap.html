@@ -84,6 +84,8 @@ body { overflow: hidden; }
 .upload-page.hidden {
   opacity: 0;
   pointer-events: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .upload-card {
   max-width: 520px;
@@ -1478,6 +1480,7 @@ function openExistingProject(files) {
     try {
       var data = JSON.parse(reader.result);
       uploadPage.classList.add('hidden');
+      uploadPage.style.display = 'none';
       enterPreview(data);
       KT.showToast('Project loaded successfully!');
     } catch (err) {
@@ -1496,6 +1499,7 @@ async function startProcessing() {
   if (!selectedFiles.length) return;
 
   uploadPage.classList.add('hidden');
+  setTimeout(function() { uploadPage.style.display = 'none'; }, 400);
   const progressOverlay = document.getElementById('progressOverlay');
   progressOverlay.classList.remove('hidden');
 
@@ -1529,6 +1533,7 @@ async function startProcessing() {
     KT.showToast('Processing failed: ' + err.message);
     setTimeout(() => {
       progressOverlay.classList.add('hidden');
+      uploadPage.style.display = '';
       uploadPage.classList.remove('hidden');
     }, 2000);
   }
@@ -1618,6 +1623,7 @@ function resetAndUpload() {
   folderInput.value = '';
   fileListEl.innerHTML = '';
   startBtn.style.display = 'none';
+  uploadPage.style.display = '';
   uploadPage.classList.remove('hidden');
 }
 
