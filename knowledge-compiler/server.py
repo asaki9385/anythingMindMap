@@ -26,6 +26,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
 from parser.pdf_splitter import split_pdf as split_pdf_fn, sanitize_filename
+from parser.text_extractor import docx_to_markdown, txt_to_markdown, split_large_text, has_heading_structure
+from parser.llm_structurer import structure_all_chunks
 from mineru_adapter.client import upload_and_process_all, download_markdowns
 
 import re
@@ -40,7 +42,7 @@ TEMP_DIR = os.path.join(BASE_DIR, "data", "_temp_uploads")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 # AI Enhancement config
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-7ef0ecb0da964eb6a8e331cbf952e9a1")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = "https://api.deepseek.com/chat/completions"
 MODEL = "deepseek-v4-flash"
 SUBJECT_CONFIG = {"name": "教育学", "exam": "333教育综合考研"}
@@ -75,7 +77,8 @@ if os.path.isdir(UI_DIR):
 
 @app.get("/")
 async def root():
-    return FileResponse(os.path.join(UI_DIR, "upload_mindmap.html"))
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/ui/upload_mindmap.html")
 
 
 # ────────────────────────────────────────────
@@ -83,7 +86,9 @@ async def root():
 # ────────────────────────────────────────────
 
 class TaskProgress:
-    def __init__(self, task_id: str, filename: str):
+    def __init__(self, task_id: str, filename: str,
+                 mineru_token: str | None = None,
+                 deepseek_api_key: str | None = None):
         self.task_id = task_id
         self.filename = filename
         self.stage = "uploading"
@@ -94,6 +99,8 @@ class TaskProgress:
         self.result = None
         self.error = None
         self.messages = []
+        self.mineru_token = mineru_token
+        self.deepseek_api_key = deepseek_api_key
         self._event = threading.Event()
 
     def set_stage(self, stage: str, progress: float = None, message: str = ""):
@@ -134,45 +141,113 @@ class TaskProgress:
 # Pipeline functions
 # ────────────────────────────────────────────
 
-def run_pipeline(task: TaskProgress, uploaded_pdfs: list[dict]):
-    """Run the full pipeline in a background thread."""
+def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
+    """Run the full pipeline in a background thread.
+    Supports mixed file types: PDF, Word (.docx), and plain text (.txt).
+    """
     work_dir = os.path.join(TEMP_DIR, task.task_id)
     os.makedirs(work_dir, exist_ok=True)
 
-    try:
-        # ── Stage 1: Split PDF ──
-        task.set_stage("splitting", 5, f"正在准备 {len(uploaded_pdfs)} 个PDF...")
-        pdf_units = _prepare_pdf_processing_units(uploaded_pdfs, work_dir, task)
-        task.set_stage("splitting", 15, f"已生成 {len(pdf_units)} 个处理单元")
+    mineru_token = task.mineru_token
+    deepseek_api_key = task.deepseek_api_key
 
-        if not pdf_units:
-            task.set_error("PDF预处理失败：未生成可识别文件")
+    try:
+        # ── Separate files by type ──
+        pdf_files = [f for f in uploaded_files if detect_file_type(f['original_name']) == 'pdf']
+        word_files = [f for f in uploaded_files if detect_file_type(f['original_name']) == 'word']
+        txt_files = [f for f in uploaded_files if detect_file_type(f['original_name']) == 'text']
+        text_files = word_files + txt_files
+
+        total = len(uploaded_files)
+        task.set_stage("splitting", 5, f"正在准备 {total} 个文档 ({len(pdf_files)} PDF, {len(word_files)} Word, {len(txt_files)} TXT)...")
+
+        # ── Stage 1: Prepare processing units ──
+        all_units = []
+        md_files = []
+
+        # PDF units
+        if pdf_files:
+            pdf_units = _prepare_pdf_processing_units(pdf_files, work_dir, task)
+            all_units.extend(pdf_units)
+
+        # Word/TXT units (already extracted to markdown)
+        if text_files:
+            text_units = _prepare_text_units(text_files, work_dir, task)
+            all_units.extend(text_units)
+            md_files.extend([u["path"] for u in text_units])
+
+        task.set_stage("splitting", 15, f"已生成 {len(all_units)} 个处理单元")
+
+        if not all_units:
+            task.set_error("预处理失败：未生成可识别文件")
             return
 
-        # ── Stage 2: MinerU OCR → Markdown ──
-        task.set_stage("ocr_converting", 20, "正在调用MinerU识别文本...")
+        # ── Stage 2: MinerU OCR → Markdown (PDF only) ──
+        pdf_units = [u for u in all_units if u['split_mode'] in ('whole_pdf', 'chapter')]
 
-        try:
-            results = upload_and_process_all([unit["path"] for unit in pdf_units], is_ocr=True)
-            md_dir = os.path.join(work_dir, "markdown")
-            md_files = download_markdowns(results, md_dir)
-            task.set_stage("ocr_converting", 40, f"MinerU识别完成，{len(md_files)} 个Markdown文件")
-        except Exception as e:
-            task.set_stage("ocr_converting", 40, f"MinerU不可用，尝试直接处理PDF文本 (MinerU error: {e})")
-            # Fallback: use PyMuPDF to extract text directly
-            md_dir = os.path.join(work_dir, "markdown")
-            os.makedirs(md_dir, exist_ok=True)
-            md_files = _fallback_pdf_to_md(pdf_units, md_dir)
-            task.messages.append(f"回退模式：使用PDF直接提取文本，{len(md_files)} 个文件")
+        if pdf_units:
+            if not mineru_token:
+                task.set_stage("ocr_converting", 20, "未提供MinerU Token，使用PyMuPDF提取PDF文本")
+                md_dir = os.path.join(work_dir, "markdown")
+                os.makedirs(md_dir, exist_ok=True)
+                fallback_md = _fallback_pdf_to_md(pdf_units, md_dir)
+                md_files.extend(fallback_md)
+                task.set_stage("ocr_converting", 40, f"PyMuPDF提取完成，{len(fallback_md)} 个Markdown文件")
+            else:
+                task.set_stage("ocr_converting", 20, f"正在识别 {len(pdf_units)} 个PDF...")
+                try:
+                    results = upload_and_process_all([unit["path"] for unit in pdf_units], is_ocr=True, token=mineru_token)
+                    md_dir = os.path.join(work_dir, "markdown")
+                    ocr_md_files = download_markdowns(results, md_dir)
+                    md_files.extend(ocr_md_files)
+                    task.set_stage("ocr_converting", 40, f"MinerU识别完成，{len(ocr_md_files)} 个Markdown文件")
+                except Exception as e:
+                    task.set_stage("ocr_converting", 40, f"MinerU不可用 ({e})，回退到PyMuPDF")
+                    md_dir = os.path.join(work_dir, "markdown")
+                    os.makedirs(md_dir, exist_ok=True)
+                    fallback_md = _fallback_pdf_to_md(pdf_units, md_dir)
+                    md_files.extend(fallback_md)
+                    task.messages.append(f"回退模式：使用PDF直接提取文本，{len(fallback_md)} 个文件")
+        else:
+            task.set_stage("ocr_converting", 40, "无PDF文件，跳过OCR阶段")
 
         if not md_files:
             task.set_error("文本提取失败")
             return
 
+        # ── Stage 2.5: LLM structuring for unstructured text ──
+        unstructured_units = [u for u in all_units if u.get('split_mode') in ('text',) and not u.get('has_structure')]
+        if unstructured_units:
+            if not deepseek_api_key:
+                task.messages.append("未提供DeepSeek API Key，跳过AI结构化，使用基础标题解析")
+                llm_trees = []
+            else:
+                task.set_stage("building_tree", 42, f"正在用AI分析 {len(unstructured_units)} 个无结构文本文档...")
+                try:
+                    llm_trees = asyncio.run(_llm_structure_chunks(unstructured_units, task, deepseek_api_key))
+                except Exception as e:
+                    task.messages.append(f"WARNING: LLM结构化失败 ({e})，使用基础解析")
+                    llm_trees = []
+        else:
+            llm_trees = []
+
         # ── Stage 3: Build trees ──
         task.set_stage("building_tree", 45, "正在构建知识树...")
-        unit_meta_by_stem = {Path(unit["path"]).stem: unit for unit in pdf_units}
+        # All units (PDF + structured text) for metadata
+        unit_meta_by_stem = {Path(unit["path"]).stem: unit for unit in all_units}
         tree_files = _build_trees_from_md(md_files, work_dir, unit_meta_by_stem)
+
+        # Add LLM-structured trees (from unstructured text)
+        for i, tree in enumerate(llm_trees):
+            if tree:
+                tree_files.append({
+                    "filename": f"llm_structured_{i}",
+                    "tree": tree,
+                    "source_order": unstructured_units[i]["source_order"],
+                    "source_title": unstructured_units[i]["source_title"],
+                    "unit_order": unstructured_units[i]["unit_order"],
+                })
+
         task.set_stage("building_tree", 60, f"知识树构建完成，{len(tree_files)} 棵树")
 
         # ── Stage 4: Fix hierarchy ──
@@ -181,15 +256,21 @@ def run_pipeline(task: TaskProgress, uploaded_pdfs: list[dict]):
         task.set_stage("building_tree", 75, "层级结构修复完成")
 
         # ── Stage 5: AI Enhancement ──
-        task.set_stage("ai_enhancing", 80, "正在AI增强节点(添加摘要/关键词/考点)...")
-        try:
-            enhanced_tree = asyncio.run(_enhance_tree(merged_tree, task))
-            task.set_stage("ai_enhancing", 95, "AI增强完成")
-        except Exception as e:
-            task.set_stage("ai_enhancing", 95, f"AI增强跳过 ({e})，使用未经增强的树")
+        if not deepseek_api_key:
+            task.set_stage("ai_enhancing", 95, "未提供DeepSeek API Key，跳过AI增强")
             from node_enhancer import cleanup_tree_structure
             merged_tree = cleanup_tree_structure(merged_tree)
             enhanced_tree = merged_tree
+        else:
+            task.set_stage("ai_enhancing", 80, "正在AI增强节点(添加摘要/关键词/考点)...")
+            try:
+                enhanced_tree = asyncio.run(_enhance_tree(merged_tree, task, deepseek_api_key))
+                task.set_stage("ai_enhancing", 95, "AI增强完成")
+            except Exception as e:
+                task.set_stage("ai_enhancing", 95, f"AI增强跳过 ({e})，使用未经增强的树")
+                from node_enhancer import cleanup_tree_structure
+                merged_tree = cleanup_tree_structure(merged_tree)
+                enhanced_tree = merged_tree
 
         # ── Stage 6: Done ──
         task.set_stage("merging", 98, "正在准备最终数据...")
@@ -239,9 +320,32 @@ def _prepare_pdf_processing_units(uploaded_pdfs: list[dict], work_dir: str, task
             chapter_title = Path(split_path).stem
             filename = f"{source_prefix}_{unit_order:03d}_{sanitize_filename(chapter_title)}.pdf"
             output_path = os.path.join(chapters_dir, filename)
-            shutil.move(split_path, output_path)
+            # Resolve paths to handle Unicode normalization on Windows
+            split_resolved = str(Path(split_path).resolve())
+            output_resolved = str(Path(output_path).resolve())
+            # Verify source exists before copy
+            if not os.path.isfile(split_resolved):
+                print(f"WARNING: split file not found: {split_resolved}")
+                # Try listing directory to find actual file
+                import glob
+                parent = str(Path(split_path).parent)
+                candidates = glob.glob(os.path.join(parent, "*.pdf"))
+                if candidates:
+                    # Match by order (unit_order-1 since enumerate starts at 1)
+                    idx = unit_order - 1
+                    if idx < len(candidates):
+                        split_resolved = candidates[idx]
+                        print(f"  Fallback: using {os.path.basename(split_resolved)}")
+                    else:
+                        print(f"  ERROR: no candidate at index {idx}")
+                        continue
+                else:
+                    print(f"  ERROR: no PDF files in {parent}")
+                    continue
+            shutil.copy2(split_resolved, output_resolved)
+            os.remove(split_resolved)
             units.append({
-                "path": output_path,
+                "path": output_resolved,
                 "source_order": pdf_index,
                 "source_title": source_title,
                 "unit_order": unit_order,
@@ -255,6 +359,55 @@ def _prepare_pdf_processing_units(uploaded_pdfs: list[dict], work_dir: str, task
     return units
 
 
+def _extract_page_text_clean(page) -> str:
+    """Extract page text, filtering header/footer regions and reordering dual-column layouts."""
+    page_height = page.rect.height
+    page_width = page.rect.width
+
+    header_threshold = page_height * 0.08
+    footer_threshold = page_height * 0.92
+
+    blocks = page.get_text("blocks")  # (x0, y0, x1, y1, text, block_no, block_type)
+
+    in_content = []
+    for block in blocks:
+        x0, y0, x1, y1, text, *_ = block
+        text = text.strip()
+        if not text:
+            continue
+        if y1 < header_threshold or y0 > footer_threshold:
+            continue
+        if len(text) < 4 and text.isdigit():
+            continue
+        in_content.append(block)
+
+    if not in_content:
+        return ""
+
+    if len(in_content) < 4:
+        return "\n\n".join(b[4].strip() for b in in_content)
+
+    # Dual-column detection on remaining blocks
+    x_centers = sorted((b[0] + b[2]) / 2 for b in in_content)
+    max_gap = 0
+    split_idx = 0
+    for i in range(len(x_centers) - 1):
+        gap = x_centers[i + 1] - x_centers[i]
+        if gap > max_gap:
+            max_gap = gap
+            split_idx = i
+
+    if max_gap > page_width * 0.3 and split_idx >= 1 and split_idx < len(x_centers) - 2:
+        page_mid_x = page_width / 2
+        left = sorted([b for b in in_content if b[0] < page_mid_x], key=lambda b: b[1])
+        right = sorted([b for b in in_content if b[0] >= page_mid_x], key=lambda b: b[1])
+        left_text = "\n".join(b[4].strip() for b in left)
+        right_text = "\n".join(b[4].strip() for b in right)
+        return left_text + "\n" + right_text
+
+    return "\n\n".join(b[4].strip() for b in in_content)
+
+
 def _fallback_pdf_to_md(pdf_units: list[dict], output_dir: str) -> list:
     """Fallback: extract text from PDFs using PyMuPDF when MinerU is unavailable."""
     import fitz
@@ -264,7 +417,7 @@ def _fallback_pdf_to_md(pdf_units: list[dict], output_dir: str) -> list:
         doc = fitz.open(pdf_path)
         text_parts = []
         for page in doc:
-            text = page.get_text("text")
+            text = _extract_page_text_clean(page)
             if text.strip():
                 text_parts.append(text)
         doc.close()
@@ -277,9 +430,126 @@ def _fallback_pdf_to_md(pdf_units: list[dict], output_dir: str) -> list:
     return md_files
 
 
+def detect_file_type(filename: str) -> str:
+    """Detect file type from extension."""
+    ext = Path(filename).suffix.lower()
+    if ext == '.pdf':
+        return 'pdf'
+    if ext == '.docx':
+        return 'word'
+    if ext == '.txt':
+        return 'text'
+    return 'unknown'
+
+
+def _prepare_text_units(uploaded_files: list[dict], work_dir: str, task: TaskProgress) -> list[dict]:
+    """Process Word (.docx) and plain text (.txt) files into markdown units."""
+    md_dir = os.path.join(work_dir, "markdown")
+    os.makedirs(md_dir, exist_ok=True)
+    units = []
+
+    for file_index, upload in enumerate(uploaded_files, start=1):
+        file_path = upload["path"]
+        original_name = upload["original_name"]
+        source_title = Path(original_name).stem
+        file_type = detect_file_type(original_name)
+        source_prefix = f"{file_index:02d}"
+
+        try:
+            if file_type == 'word':
+                md_text = docx_to_markdown(file_path)
+                task.messages.append(f"[DOCX] {source_title}: 已提取Word文档内容")
+            elif file_type == 'text':
+                md_text = txt_to_markdown(file_path)
+                task.messages.append(f"[TXT] {source_title}: 已提取文本内容")
+            else:
+                continue
+
+            # Check if the text has good heading structure
+            has_structure = has_heading_structure(md_text)
+
+            # Split large text into chunks
+            chunks = split_large_text(md_text)
+            task.messages.append(f"{source_title}: {len(md_text)} 字, {len(chunks)} 个处理单元")
+
+            for chunk_idx, chunk in enumerate(chunks):
+                chunk_text = chunk["text"]
+                filename = f"{source_prefix}_{chunk_idx:03d}_{sanitize_filename(source_title)}.md"
+                md_path = os.path.join(md_dir, filename)
+                with open(md_path, "w", encoding="utf-8") as f:
+                    f.write(chunk_text)
+
+                units.append({
+                    "path": md_path,
+                    "source_order": file_index,
+                    "source_title": source_title,
+                    "unit_order": chunk_idx,
+                    "unit_title": source_title if len(chunks) == 1 else f"{source_title}_part{chunk_idx + 1}",
+                    "split_mode": file_type,  # 'word' or 'text'
+                    "has_structure": has_structure,
+                    "chunk_meta": chunk,
+                })
+
+        except Exception as e:
+            task.messages.append(f"WARNING: {original_name} 处理失败: {e}")
+            print(f"ERROR processing {original_name}: {traceback.format_exc()}")
+
+    return units
+
+
+async def _llm_structure_chunks(units: list[dict], task: TaskProgress, api_key: str) -> list[dict]:
+    """Use LLM to create tree structure from unstructured text chunks."""
+    from parser.text_extractor import split_large_text
+
+    trees = []
+    for unit in units:
+        md_path = unit["path"]
+        with open(md_path, encoding="utf-8") as f:
+            text = f.read().strip()
+
+        if not text:
+            trees.append(None)
+            continue
+
+        # Split into chunks if needed
+        chunks = unit.get("chunk_meta")
+        if chunks is None:
+            chunk_list = split_large_text(text)
+        else:
+            chunk_list = [chunks]
+
+        # Process chunks sequentially with context bridging
+        try:
+            chunk_trees = await structure_all_chunks(chunk_list, api_key=api_key)
+            if chunk_trees:
+                # Merge multiple chunk trees into one
+                if len(chunk_trees) == 1:
+                    trees.append(chunk_trees[0])
+                else:
+                    merged = {
+                        "title": unit.get("source_title", "文档"),
+                        "children": [],
+                    }
+                    for ct in chunk_trees:
+                        if ct and ct.get("children"):
+                            merged["children"].extend(ct["children"])
+                        elif ct:
+                            merged["children"].append(ct)
+                    trees.append(merged)
+                task.messages.append(f"  [LLM] {unit.get('source_title', '?')}: 结构化完成")
+            else:
+                trees.append(None)
+        except Exception as e:
+            task.messages.append(f"  [LLM] {unit.get('source_title', '?')}: 结构化失败 ({e})")
+            trees.append(None)
+
+    return trees
+
+
 def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict | None = None) -> list:
     """Build tree JSONs from markdown files using tree_builder logic."""
     from tree_builder import parse_md_to_nodes, adjust_standalone_levels, build_tree
+    from hierarchy_repair import apply_hierarchy_repair
 
     tree_dir = os.path.join(work_dir, "trees")
     os.makedirs(tree_dir, exist_ok=True)
@@ -294,6 +564,7 @@ def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict 
         unit_meta = unit_meta_by_stem.get(filename, {})
         nodes = parse_md_to_nodes(md_text)
         nodes = adjust_standalone_levels(nodes)
+        nodes = apply_hierarchy_repair(nodes)
         tree_children = build_tree(nodes)
         tree = {"title": unit_meta.get("unit_title", filename), "children": tree_children}
 
@@ -452,7 +723,7 @@ def _fix_hierarchy_and_merge(tree_files: list, work_dir: str) -> dict:
     return {"title": "Knowledge Tree", "children": root_children}
 
 
-async def _enhance_tree(tree: dict, task: TaskProgress) -> dict:
+async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str) -> dict:
     """Enhance tree nodes with AI summaries, keywords, and exam points.
     Reports progress to task object and limits scope for responsiveness.
     Now includes adaptive profile detection and structural cleanup."""
@@ -503,7 +774,7 @@ async def _enhance_tree(tree: dict, task: TaskProgress) -> dict:
                 OPENAI_BASE_URL,
                 json=test_payload,
                 headers={
-                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json"
                 }
             )
@@ -526,7 +797,7 @@ async def _enhance_tree(tree: dict, task: TaskProgress) -> dict:
             prompt = build_prompt(node, SUBJECT_CONFIG, get_context_text(node), "", document_profile)
             payload = {
                 "model": MODEL,
-                "max_tokens": 600,
+                "max_tokens": 1000,
                 "temperature": 0.3,
                 "response_format": {"type": "json_object"},
                 "messages": [{"role": "user", "content": prompt}]
@@ -536,7 +807,7 @@ async def _enhance_tree(tree: dict, task: TaskProgress) -> dict:
                     OPENAI_BASE_URL,
                     json=payload,
                     headers={
-                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json"
                     },
                     timeout=API_TIMEOUT
@@ -551,6 +822,8 @@ async def _enhance_tree(tree: dict, task: TaskProgress) -> dict:
                 node["summary"] = result.get("summary", "")
                 node["keywords"] = result.get("keywords", [])
                 node["exam_points"] = result.get("exam_points", [])
+                node["mermaid"] = result.get("mermaid", "") or ""
+                node["tables"] = result.get("tables", []) or []
             except Exception:
                 async with fail_lock:
                     fail_count += 1
@@ -595,6 +868,10 @@ def _prepare_final_json(tree: dict) -> dict:
             node["keywords"] = []
         if "exam_points" not in node:
             node["exam_points"] = []
+        if "mermaid" not in node:
+            node["mermaid"] = ""
+        if "tables" not in node:
+            node["tables"] = []
         if "children" not in node:
             node["children"] = []
         for child in node.get("children", []):
@@ -611,32 +888,43 @@ def _prepare_final_json(tree: dict) -> dict:
 # ────────────────────────────────────────────
 
 @app.post("/api/upload")
-async def api_upload(files: list[UploadFile] = File(...)):
+async def api_upload(
+    files: list[UploadFile] = File(...),
+    mineru_token: str = Form(""),
+    deepseek_api_key: str = Form(""),
+):
     task_id = str(uuid.uuid4())[:8]
-    task_label = files[0].filename if len(files) == 1 else f"{len(files)} PDFs"
-    task = TaskProgress(task_id, task_label)
+    task_label = files[0].filename if len(files) == 1 else f"{len(files)} 个文档"
+    task = TaskProgress(
+        task_id,
+        task_label,
+        mineru_token=mineru_token.strip() or None,
+        deepseek_api_key=deepseek_api_key.strip() or None,
+    )
 
     # Save uploaded files
     work_dir = os.path.join(TEMP_DIR, task_id)
     os.makedirs(work_dir, exist_ok=True)
     uploads_dir = os.path.join(work_dir, "uploads")
     os.makedirs(uploads_dir, exist_ok=True)
-    uploaded_pdfs = []
+    uploaded_files = []
 
     for index, upload in enumerate(files, start=1):
         content = await upload.read()
         filename = f"{index:02d}_{sanitize_filename(upload.filename)}"
-        pdf_path = os.path.join(uploads_dir, filename)
-        with open(pdf_path, "wb") as f:
+        file_path = os.path.join(uploads_dir, filename)
+        with open(file_path, "wb") as f:
             f.write(content)
-        uploaded_pdfs.append({"path": pdf_path, "original_name": upload.filename})
-        task.messages.append(f"文件已上传: {upload.filename} ({len(content) / 1024 / 1024:.1f} MB)")
+        uploaded_files.append({"path": file_path, "original_name": upload.filename})
+        ft = detect_file_type(upload.filename)
+        type_label = {"pdf": "PDF", "word": "Word", "text": "TXT"}.get(ft, ft)
+        task.messages.append(f"文件已上传: [{type_label}] {upload.filename} ({len(content) / 1024 / 1024:.1f} MB)")
 
     with tasks_lock:
         tasks[task_id] = task
 
     # Launch pipeline in background thread
-    thread = threading.Thread(target=run_pipeline, args=(task, uploaded_pdfs), daemon=True)
+    thread = threading.Thread(target=run_pipeline, args=(task, uploaded_files), daemon=True)
     thread.start()
 
     return JSONResponse({"task_id": task_id, "filenames": [upload.filename for upload in files]})
@@ -724,7 +1012,6 @@ async def api_export(task_id: str):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("mindmap.html", html_content)
-        _write_directory_to_zip(zf, os.path.join(work_dir, "chapters"), "chapters")
         _write_directory_to_zip(zf, os.path.join(work_dir, "markdown"), "md")
         if os.path.isdir(export_json_dir):
             _write_directory_to_zip(zf, export_json_dir, "json")
@@ -789,6 +1076,53 @@ def _generate_offline_html() -> str:
     )
     return html
 
+@app.post("/api/update-node")
+async def api_update_node(data: dict):
+    """Update a node's title/content in the source JSON file (enhanced tree)."""
+    filename = data.get("filename", "")
+    path_in_file = data.get("path", [])
+    new_title = data.get("title", "").strip()
+    new_content = data.get("content")  # optional, None means don't update
+
+    if not filename or not new_title:
+        return JSONResponse({"error": "filename and title are required"}, status_code=400)
+
+    # Sanitize filename to prevent path traversal
+    safe_filename = os.path.basename(filename)
+    filepath = os.path.join(BASE_DIR, "data", "tree_parts_enhanced_fixed", safe_filename)
+
+    if not os.path.exists(filepath):
+        return JSONResponse({"error": f"File not found: {safe_filename}"}, status_code=404)
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            tree = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        return JSONResponse({"error": f"Failed to read file: {str(e)}"}, status_code=500)
+
+    # Navigate to the target node
+    try:
+        node = tree
+        for idx in path_in_file:
+            node = node["children"][idx]
+    except (IndexError, KeyError, TypeError):
+        return JSONResponse({"error": "Invalid node path"}, status_code=400)
+
+    node["title"] = new_title
+    if "name" in node:
+        node["name"] = new_title
+    if new_content is not None:
+        node["content"] = new_content
+
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(tree, f, ensure_ascii=False, indent=2)
+    except IOError as e:
+        return JSONResponse({"error": f"Failed to write file: {str(e)}"}, status_code=500)
+
+    return {"status": "ok", "title": new_title, "content_updated": new_content is not None}
+
+
 @app.get("/api/health")
 async def api_health():
     return {"status": "ok", "tasks": len(tasks)}
@@ -800,6 +1134,8 @@ async def api_health():
 
 if __name__ == "__main__":
     import uvicorn
-    print("Starting Knowledge Tree Pipeline Server...")
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+    print(f"Starting Knowledge Tree Pipeline Server on {host}:{port}...")
     print(f"Temp dir: {TEMP_DIR}")
-    uvicorn.run(app, host="0.0.0.0", port=8700)
+    uvicorn.run(app, host=host, port=port)
