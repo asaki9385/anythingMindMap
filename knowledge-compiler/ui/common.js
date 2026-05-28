@@ -75,6 +75,29 @@ function escapeHtml(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function htmlToMarkdown(html) {
+  if (!html) return '';
+  var md = html;
+  md = md.replace(/<br\s*\/?>/gi, '\n');
+  md = md.replace(/<b>([\s\S]*?)<\/b>/gi, '**$1**');
+  md = md.replace(/<strong>([\s\S]*?)<\/strong>/gi, '**$1**');
+  md = md.replace(/<i>([\s\S]*?)<\/i>/gi, '*$1*');
+  md = md.replace(/<em>([\s\S]*?)<\/em>/gi, '*$1*');
+  md = md.replace(/<s>([\s\S]*?)<\/s>/gi, '~~$1~~');
+  md = md.replace(/<strike>([\s\S]*?)<\/strike>/gi, '~~$1~~');
+  md = md.replace(/<del>([\s\S]*?)<\/del>/gi, '~~$1~~');
+  md = md.replace(/<div>/gi, '\n');
+  md = md.replace(/<\/div>/gi, '');
+  md = md.replace(/<[^>]+>/g, '');
+  md = md.replace(/&amp;/g, '&');
+  md = md.replace(/&lt;/g, '<');
+  md = md.replace(/&gt;/g, '>');
+  md = md.replace(/&quot;/g, '"');
+  md = md.replace(/&#39;/g, "'");
+  md = md.replace(/\n{3,}/g, '\n\n');
+  return md;
+}
+
 function highlightKeywords(text, keywords) {
   if (!keywords || keywords.length === 0) return text;
   var result = text;
@@ -533,6 +556,7 @@ global.KT = {
   getChartLeafLabelColor: getChartLeafLabelColor,
   // HTML
   escapeHtml: escapeHtml,
+  htmlToMarkdown: htmlToMarkdown,
   highlightKeywords: highlightKeywords,
   // Content
   formatSummary: formatSummary,
