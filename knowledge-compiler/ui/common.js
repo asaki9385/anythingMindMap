@@ -341,6 +341,7 @@ function formatContent(text, keywords, maxLen, highlights) {
       continue;
     }
     var processed = highlightKeywords(escapeHtml(line), keywords);
+    processed = markdownToHtml(processed);
     processed = applyHighlights(processed, highlights);
     processed = renderInlineFormulas(processed);
     html += '<p class="content-para">' + processed + '</p>';
