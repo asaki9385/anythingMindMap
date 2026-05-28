@@ -335,7 +335,8 @@ async def enhance_one(client: httpx.AsyncClient, node: dict,
                 return
 
             raw = resp.json()["choices"][0]["message"]["content"].strip()
-            raw = re.sub(r'^```json\s*|\s*```$', '', raw)
+            raw = re.sub(r'^```(?:json)?\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
             result = json.loads(raw)
 
             node['summary']     = result.get('summary', '')
