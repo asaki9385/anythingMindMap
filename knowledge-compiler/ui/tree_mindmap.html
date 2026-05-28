@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Tree - Mind Map</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0f1117; --bg2: #1a1d27; --bg3: #242836;
+  --text: #e4e4e7; --text2: #a1a1aa; --text3: #71717a;
+  --accent: #6366f1; --accent2: #818cf8;
+  --green: #22c55e; --yellow: #eab308; --orange: #f97316; --red: #ef4444;
+  --border: #2e3345; --radius: 8px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  z-index: 10;
+}
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+}
+.controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.control-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.control-group label {
+  font-size: 13px;
+  color: var(--text3);
+}
+select, button {
+  padding: 6px 12px;
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+select:hover, button:hover {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+}
+button {
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--accent2);
+  font-weight: 500;
+}
+button:hover {
+  background: rgba(99, 102, 241, 0.3);
+}
+.stats {
+  font-size: 12px;
+  color: var(--text3);
+}
+#chart {
+  flex: 1;
+  width: 100%;
+}
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text3);
+  font-size: 14px;
+}
+.spinner {
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--accent);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 0.8s linear infinite;
+  margin-right: 12px;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.info-panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  padding: 24px;
+  width: 420px;
+  max-width: 45vw;
+  font-size: 13px;
+  color: var(--text2);
+  display: none;
+  z-index: 1000;
+  overflow-y: auto;
+  box-shadow: -4px 0 32px rgba(0,0,0,0.4);
+}
+.info-panel.show { display: block; }
+.info-panel .node-title {
+  color: var(--accent2);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.info-panel .field-label {
+  color: var(--text3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+.info-panel .summary { line-height: 1.5; }
+.info-panel .keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.info-panel .keyword-tag {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.info-panel .exam-point {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.info-panel .exam-meta {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.info-panel .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+}
+.info-panel .close-btn:hover { color: var(--text); }
+.sum-para {
+  margin: 4px 0;
+  text-indent: 1.4em;
+  line-height: 1.7;
+  font-size: 13px;
+  color: var(--text2);
+}
+.sum-hl {
+  color: var(--accent2);
+  background: rgba(99, 102, 241, 0.12);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+.sum-ellipsis {
+  color: var(--text3);
+  margin-left: 2px;
+}
+.sum-noindent {
+  text-indent: 0;
+}
+.tooltip-summary {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a1a1aa;
+}
+.tooltip-summary .sum-para {
+  font-size: 12px;
+  margin: 3px 0;
+  text-indent: 1em;
+}
+.tooltip-summary .sum-hl {
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.15);
+}
+.content-para {
+  margin: 6px 0;
+  line-height: 1.65;
+  font-size: 13px;
+  color: var(--text2);
+  text-indent: 1.4em;
+}
+.tooltip-content {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a1a1aa;
+}
+.tooltip-content .content-para {
+  font-size: 12px;
+  margin: 3px 0;
+  text-indent: 1em;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Knowledge Tree Mind Map</h1>
+    <div class="controls">
+      <div class="control-group">
+        <label for="layoutSelect">Layout:</label>
+        <select id="layoutSelect">
+          <option value="LR" selected>Left-Right</option>
+          <option value="RL">Right-Left</option>
+          <option value="TB">Top-Bottom</option>
+          <option value="BT">Bottom-Top</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="expandLevel">Expand:</label>
+        <select id="expandLevel">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </div>
+      <button onclick="fitView()">Fit View</button>
+      <button onclick="expandAll()">Expand All</button>
+      <button onclick="collapseAll()">Collapse All</button>
+      <div class="stats" id="stats">Loading...</div>
+    </div>
+  </div>
+  <div id="chart" class="loading">
+    <span class="spinner"></span>
+    <span>Loading knowledge tree...</span>
+  </div>
+  <div class="info-panel" id="infoPanel">
+    <button class="close-btn" onclick="closePanel()">&times;</button>
+    <div id="infoContent"></div>
+  </div>
+</div>
+
+<script>
+let chart = null;
+let treeData = null;
+let allNodes = [];
+let currentLayout = 'LR';
+let currentExpandLevel = 2;
+
+// Level color palette
+const LEVEL_COLORS = [
+  '#6366f1', // L0: root
+  '#818cf8', // L1: Part
+  '#22c55e', // L2: chapter
+  '#eab308', // L3: section
+  '#f97316', // L4: topic
+  '#a78bfa'  // L5: leaf
+];
+
+function getNodeColor(level) {
+  return LEVEL_COLORS[Math.min(level, LEVEL_COLORS.length - 1)];
+}
+
+function formatSummary(summary, keywords, maxLen) {
+  if (!summary) return '';
+  var text = summary;
+  if (maxLen > 0 && text.length > maxLen) {
+    text = text.substring(0, maxLen) + '…';
+  }
+  var sentences = text.split(/(?<=[。；])/);
+  var groupSize = 3;
+  var html = '';
+  for (var i = 0; i < sentences.length; i += groupSize) {
+    var chunk = sentences.slice(i, i + groupSize).join('');
+    if (keywords && keywords.length > 0) {
+      keywords.forEach(function(kw) {
+        if (kw.length >= 2) {
+          var escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var regex = new RegExp('(' + escaped + ')', 'g');
+          chunk = chunk.replace(regex, '<span class="sum-hl">$1</span>');
+        }
+      });
+    }
+    html += '<p class="sum-para">' + chunk + '</p>';
+  }
+  return html;
+}
+
+function formatContent(text, keywords, maxLen) {
+  if (!text) return '';
+  var t = text;
+  if (maxLen > 0 && t.length > maxLen) {
+    t = t.substring(0, maxLen) + '…';
+  }
+  var lines = t.split(/\n+/).filter(function(l) { return l.trim(); });
+  if (lines.length === 0) return '';
+  var html = '';
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (keywords && keywords.length > 0) {
+      keywords.forEach(function(kw) {
+        if (kw.length >= 2) {
+          var escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var regex = new RegExp('(' + escaped + ')', 'g');
+          line = line.replace(regex, '<span class="sum-hl">$1</span>');
+        }
+      });
+    }
+    html += '<p class="content-para">' + line + '</p>';
+  }
+  return html;
+}
+
+function transformNode(node, depth = 0) {
+  const name = node.title || node.name || 'Untitled';
+  const transformed = {
+    name: name,
+    title: node.title || node.name,
+    level: node.level != null ? node.level : depth,
+    depth: depth,
+    summary: node.summary || '',
+    keywords: node.keywords || [],
+    exam_points: node.exam_points || [],
+    content: node.content || '',
+    children: []
+  };
+
+  if (node.children && Array.isArray(node.children) && node.children.length > 0) {
+    transformed.children = node.children.map(child => transformNode(child, depth + 1));
+  }
+
+  return transformed;
+}
+
+async function loadAllParts() {
+  const partFiles = [];
+  for (let i = 1; i <= 4; i++) {
+    const filename = `Part_${i}_tree_enhanced.json`;
+    partFiles.push(
+      fetch(`../data/tree_parts_enhanced_fixed/${filename}`)
+        .then(res => {
+          if (!res.ok) throw new Error(`Failed to load ${filename}: ${res.status}`);
+          return res.json();
+        })
+        .catch(err => {
+          console.warn(`Skipping ${filename}:`, err.message);
+          return null;
+        })
+    );
+  }
+
+  const parts = await Promise.all(partFiles);
+  const validParts = parts.filter(p => p !== null);
+
+  if (validParts.length === 0) {
+    throw new Error('No data files loaded. Check that tree_parts_enhanced_fixed/ contains Part_1..4 JSON files.');
+  }
+
+  const transformedParts = validParts.map((part, idx) => {
+    const node = transformNode(part, 1);
+    // If the top-level part has no title, label it
+    if (!node.title || node.title === 'Part_' + (idx + 1)) {
+      node.name = `Part ${idx + 1}`;
+      node.title = `Part ${idx + 1}`;
+    }
+    return node;
+  });
+
+  return {
+    name: 'Knowledge Tree',
+    title: 'Knowledge Tree',
+    level: 0,
+    depth: 0,
+    summary: `${validParts.length} parts loaded with enhanced data`,
+    keywords: [],
+    exam_points: [],
+    content: '',
+    children: transformedParts
+  };
+}
+
+function flattenNodes(node, path, depth = 0) {
+  const currentPath = [...path, node.name];
+  allNodes.push({ node, path: currentPath, depth });
+  if (node.children) {
+    for (const child of node.children) {
+      flattenNodes(child, currentPath, depth + 1);
+    }
+  }
+}
+
+function countNodes(node) {
+  let count = 1;
+  if (node.children) {
+    for (const child of node.children) {
+      count += countNodes(child);
+    }
+  }
+  return count;
+}
+
+async function initChart() {
+  const chartContainer = document.getElementById('chart');
+  chart = echarts.init(chartContainer, null, { renderer: 'canvas' });
+
+  try {
+    treeData = await loadAllParts();
+    allNodes = [];
+    flattenNodes(treeData, []);
+
+    const totalNodes = allNodes.length;
+    const partCount = (treeData.children || []).length;
+    const enhancedCount = allNodes.filter(n => n.node.summary && n.node.summary.length > 0).length;
+    document.getElementById('stats').textContent =
+      `Nodes: ${totalNodes} | Parts: ${partCount} | Enhanced: ${enhancedCount}`;
+
+    renderChart(currentLayout, currentExpandLevel);
+
+    document.getElementById('layoutSelect').addEventListener('change', (e) => {
+      currentLayout = e.target.value;
+      renderChart(currentLayout, currentExpandLevel);
+    });
+
+    document.getElementById('expandLevel').addEventListener('change', (e) => {
+      currentExpandLevel = parseInt(e.target.value);
+      renderChart(currentLayout, currentExpandLevel);
+    });
+
+    chart.on('click', (params) => {
+      if (params.componentSubType === 'tree') {
+        showNodeInfo(params.data);
+      }
+    });
+
+    window.addEventListener('resize', () => chart.resize());
+
+  } catch (error) {
+    chartContainer.innerHTML = `<div style="color: #ef4444; padding: 24px; font-size: 14px;">
+      <strong>Error loading data</strong><br/>${error.message}<br/><br/>
+      <span style="color: #71717a;">Make sure you are serving this file via HTTP (e.g. <code>python -m http.server</code>), not opening directly as file://</span>
+    </div>`;
+  }
+}
+
+function getLabelPosition(layout) {
+  if (layout === 'LR') return 'right';
+  if (layout === 'RL') return 'left';
+  if (layout === 'TB') return 'bottom';
+  return 'top';
+}
+
+function getLeafLabelPosition(layout) {
+  if (layout === 'LR') return 'right';
+  if (layout === 'RL') return 'left';
+  if (layout === 'TB') return 'bottom';
+  return 'top';
+}
+
+function renderChart(layout, expandLevel) {
+  const isHorizontal = layout === 'LR' || layout === 'RL';
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      triggerOn: 'mousemove',
+      confine: false,
+      backgroundColor: 'rgba(15, 17, 23, 0.96)',
+      borderColor: 'rgba(99, 102, 241, 0.3)',
+      borderWidth: 1,
+      padding: [12, 16],
+      textStyle: { color: '#e4e4e7', fontSize: 12, lineHeight: 20 },
+      extraCssText: 'white-space: normal; word-wrap: break-word; overflow-wrap: break-word;',
+      formatter: function(params) {
+        if (params.componentSubType !== 'tree') return '';
+        const d = params.data;
+        let html = `<div style="max-width: 480px; word-wrap: break-word; overflow-wrap: break-word;">`;
+        html += `<div style="font-size:14px;font-weight:700;color:#818cf8;margin-bottom:6px;">${d.name}</div>`;
+
+        if (d.level != null) {
+          html += `<span style="font-size:10px;color:#71717a;">Level ${d.level}</span>`;
+        }
+
+        if (d.summary) {
+          html += `<div class="tooltip-summary" style="margin-top:8px;">${formatSummary(d.summary, d.keywords, 0)}</div>`;
+        }
+
+        if (d.keywords && d.keywords.length > 0) {
+          html += `<div style="margin-top:8px;">`;
+          html += d.keywords.map(k =>
+            `<span style="display:inline-block;background:rgba(99,102,241,0.12);color:#818cf8;padding:1px 6px;border-radius:3px;font-size:10px;margin:1px 2px;">${k}</span>`
+          ).join('');
+          html += `</div>`;
+        }
+
+        if (d.exam_points && d.exam_points.length > 0) {
+          html += `<div style="margin-top:8px;border-top:1px solid rgba(99,102,241,0.15);padding-top:6px;">`;
+          d.exam_points.forEach(ep => {
+            const freqColor = ep.frequency === '高频' ? '#22c55e' : ep.frequency === '中频' ? '#eab308' : '#71717a';
+            html += `<div style="font-size:11px;margin:3px 0;"><span style="color:${freqColor};">${ep.frequency || ''}</span> <span style="color:#71717a;">[${ep.type || ''}]</span> ${ep.point}</div>`;
+          });
+          html += `</div>`;
+        }
+
+        if (d.content && !d.content.startsWith('graph')) {
+          html += `<div class="tooltip-content" style="margin-top:6px;border-top:1px solid rgba(99,102,241,0.15);padding-top:6px;">${formatContent(d.content, d.keywords, 0)}</div>`;
+        }
+
+        if (d.children && d.children.length > 0) {
+          html += `<div style="margin-top:6px;font-size:10px;color:#71717a;">${d.children.length} child nodes</div>`;
+        }
+
+        html += `</div>`;
+        return html;
+      }
+    },
+    series: [
+      {
+        type: 'tree',
+        data: [treeData],
+        top: '4%',
+        left: isHorizontal ? '8%' : '8%',
+        right: isHorizontal ? '20%' : '8%',
+        bottom: '4%',
+        orient: layout,
+        symbol: 'circle',
+        symbolSize: function(value, params) {
+          const d = params.data;
+          const level = d.level || 0;
+          if (level === 0) return [20, 20];
+          if (level === 1) return [14, 14];
+          if (level === 2) return [10, 10];
+          return [7, 7];
+        },
+        initialTreeDepth: expandLevel,
+        expandAndCollapse: true,
+        animationDuration: 500,
+        animationDurationUpdate: 500,
+        animationEasing: 'cubicOut',
+        roam: true,
+        itemStyle: {
+          borderWidth: 1.5,
+          borderColor: function(params) {
+            return getNodeColor(params.data.level || 0) + '80';
+          },
+          color: function(params) {
+            return getNodeColor(params.data.level || 0);
+          }
+        },
+        label: {
+          position: getLabelPosition(layout),
+          verticalAlign: 'middle',
+          align: 'left',
+          fontSize: 12,
+          color: '#e4e4e7',
+          fontWeight: 500,
+          formatter: function(params) {
+            const d = params.data;
+            const name = d.name || '';
+            if (d.summary && d.summary.length > 0 && d.level > 0) {
+              return `{enhanced|} ${name}`;
+            }
+            return name;
+          },
+          rich: {
+            enhanced: {
+              backgroundColor: 'rgba(34, 197, 94, 0.3)',
+              borderRadius: 3,
+              width: 4,
+              height: 4
+            }
+          }
+        },
+        leaves: {
+          label: {
+            position: getLeafLabelPosition(layout),
+            verticalAlign: 'middle',
+            align: 'left',
+            fontSize: 11,
+            color: '#a1a1aa'
+          }
+        },
+        lineStyle: {
+          color: 'rgba(99, 102, 241, 0.2)',
+          width: 1.5,
+          curveness: 0.5
+        },
+        emphasis: {
+          itemStyle: {
+            color: '#fbbf24',
+            borderColor: '#fbbf24',
+            borderWidth: 2,
+            shadowBlur: 12,
+            shadowColor: 'rgba(251, 191, 36, 0.3)'
+          },
+          label: {
+            color: '#fbbf24',
+            fontWeight: 'bold',
+            fontSize: 13
+          }
+        },
+        edgeShape: 'curve'
+      }
+    ]
+  };
+
+  chart.setOption(option, true);
+}
+
+function showNodeInfo(d) {
+  const panel = document.getElementById('infoPanel');
+  const content = document.getElementById('infoContent');
+  let html = `<div class="node-title">${d.name}</div>`;
+
+  if (d.level != null) {
+    html += `<span style="font-size:11px;color:var(--text3);">Level ${d.level}</span>`;
+  }
+
+  if (d.summary) {
+    html += `<div class="field-label">Summary</div>`;
+    html += `<div class="summary">${formatSummary(d.summary, d.keywords, 0)}</div>`;
+  }
+
+  if (d.keywords && d.keywords.length > 0) {
+    html += `<div class="field-label">Keywords</div>`;
+    html += `<div class="keywords">`;
+    html += d.keywords.map(k => `<span class="keyword-tag">${k}</span>`).join('');
+    html += `</div>`;
+  }
+
+  if (d.exam_points && d.exam_points.length > 0) {
+    html += `<div class="field-label">Exam Points</div>`;
+    d.exam_points.forEach(ep => {
+      const freqColor = ep.frequency === '高频' ? 'var(--green)' :
+                         ep.frequency === '中频' ? 'var(--yellow)' : 'var(--text3)';
+      html += `<div class="exam-point">
+        ${ep.point}
+        <div class="exam-meta">
+          <span style="color:${freqColor};">${ep.frequency || '-'}</span> &middot; ${ep.type || '-'}
+        </div>
+      </div>`;
+    });
+  }
+
+  if (d.content && d.content.length > 0 && !d.content.startsWith('graph')) {
+    html += `<div class="field-label">Content</div>`;
+    html += `<div>${formatContent(d.content, d.keywords, 0)}</div>`;
+  }
+
+  if (d.children && d.children.length > 0) {
+    html += `<div style="margin-top:10px;font-size:11px;color:var(--text3);">${d.children.length} child node(s)</div>`;
+  }
+
+  content.innerHTML = html;
+  panel.classList.add('show');
+}
+
+function closePanel() {
+  document.getElementById('infoPanel').classList.remove('show');
+}
+
+function fitView() {
+  if (!chart) return;
+  chart.setOption({}, { replaceMerge: ['series'] });
+  renderChart(currentLayout, currentExpandLevel);
+}
+
+function expandAll() {
+  if (!chart) return;
+  currentExpandLevel = 5;
+  document.getElementById('expandLevel').value = '5';
+  renderChart(currentLayout, 5);
+}
+
+function collapseAll() {
+  if (!chart) return;
+  currentExpandLevel = 1;
+  document.getElementById('expandLevel').value = '1';
+  renderChart(currentLayout, 1);
+}
+
+window.addEventListener('DOMContentLoaded', initChart);
+</script>
+</body>
+</html>

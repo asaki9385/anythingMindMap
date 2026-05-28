@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Tree - Upload & Mind Map</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0f1117; --bg2: #1a1d27; --bg3: #242836;
+  --text: #e4e4e7; --text2: #a1a1aa; --text3: #71717a;
+  --accent: #6366f1; --accent2: #818cf8;
+  --green: #22c55e; --yellow: #eab308; --orange: #f97316; --red: #ef4444;
+  --border: #2e3345; --radius: 8px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  z-index: 10;
+}
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+}
+.controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.control-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.control-group label {
+  font-size: 13px;
+  color: var(--text3);
+}
+select, button {
+  padding: 6px 12px;
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+select:hover, button:hover {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+}
+button.primary {
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--accent2);
+  font-weight: 500;
+}
+button.primary:hover {
+  background: rgba(99, 102, 241, 0.3);
+}
+.stats {
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* ── Upload Overlay ── */
+.upload-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  transition: opacity 0.4s;
+}
+.upload-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.upload-box {
+  background: var(--bg2);
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 48px 64px;
+  text-align: center;
+  max-width: 520px;
+  width: 90%;
+  transition: all 0.3s;
+}
+.upload-box.drag-over {
+  border-color: var(--accent2);
+  background: rgba(99, 102, 241, 0.08);
+  transform: scale(1.02);
+}
+.upload-box h2 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+.upload-box p {
+  color: var(--text3);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.upload-box .icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+}
+.upload-hint {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 16px;
+}
+.file-input-label {
+  display: inline-block;
+  padding: 12px 28px;
+  background: var(--accent);
+  color: white;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.file-input-label:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+#fileInput {
+  display: none;
+}
+.selected-file {
+  margin-top: 16px;
+  padding: 10px 16px;
+  background: var(--bg3);
+  border-radius: var(--radius);
+  display: none;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.selected-file .file-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selected-file .file-size {
+  color: var(--text3);
+  font-size: 12px;
+}
+.start-btn {
+  margin-top: 20px;
+  padding: 10px 32px;
+  background: var(--green);
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  display: none;
+  transition: all 0.2s;
+}
+.start-btn:hover {
+  background: #16a34a;
+  transform: translateY(-1px);
+}
+.start-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Progress Overlay ── */
+.progress-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  backdrop-filter: blur(6px);
+}
+.progress-overlay.hidden {
+  display: none;
+}
+.progress-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px 48px;
+  text-align: center;
+  min-width: 420px;
+  max-width: 520px;
+  width: 90%;
+}
+.progress-panel h2 {
+  font-size: 20px;
+  margin-bottom: 24px;
+}
+.progress-bar-wrap {
+  background: var(--bg3);
+  border-radius: 8px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 8px;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+.progress-stages {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.progress-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text3);
+  flex: 1;
+}
+.progress-stage .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 2px solid var(--border);
+  transition: all 0.3s;
+}
+.progress-stage.active .dot {
+  background: var(--accent);
+  border-color: var(--accent2);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+.progress-stage.done .dot {
+  background: var(--green);
+  border-color: var(--green);
+}
+.progress-stage .stage-label {
+  text-align: center;
+  line-height: 1.3;
+}
+.progress-stage.active .stage-label {
+  color: var(--accent2);
+}
+.progress-stage.done .stage-label {
+  color: var(--green);
+}
+.progress-message {
+  font-size: 13px;
+  color: var(--text2);
+  margin-top: 16px;
+  min-height: 20px;
+}
+.spinner-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── Main Content Area ── */
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+#chart {
+  flex: 1;
+}
+.loading-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text3);
+  font-size: 14px;
+  flex-direction: column;
+  gap: 16px;
+}
+.loading-placeholder .big-icon {
+  font-size: 56px;
+  opacity: 0.3;
+}
+
+/* ── Info Panel ── */
+.info-panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  padding: 24px;
+  width: 420px;
+  max-width: 45vw;
+  font-size: 13px;
+  color: var(--text2);
+  display: none;
+  z-index: 1000;
+  overflow-y: auto;
+  box-shadow: -4px 0 32px rgba(0,0,0,0.4);
+}
+.info-panel.show { display: block; }
+.info-panel .node-title {
+  color: var(--accent2);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.info-panel .field-label {
+  color: var(--text3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+.info-panel .summary { line-height: 1.5; }
+.info-panel .keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.info-panel .keyword-tag {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.info-panel .exam-point {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.info-panel .exam-meta {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.info-panel .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+}
+.info-panel .close-btn:hover { color: var(--text); }
+.sum-para {
+  margin: 4px 0;
+  text-indent: 1.4em;
+  line-height: 1.7;
+  font-size: 13px;
+  color: var(--text2);
+}
+.sum-hl {
+  color: var(--accent2);
+  background: rgba(99, 102, 241, 0.12);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+.content-para {
+  margin: 6px 0;
+  line-height: 1.65;
+  font-size: 13px;
+  color: var(--text2);
+  text-indent: 1.4em;
+}
+
+/* ── Tooltip ── */
+.tooltip-summary {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a1a1aa;
+}
+.tooltip-summary .sum-para {
+  font-size: 12px;
+  margin: 3px 0;
+  text-indent: 1em;
+}
+.tooltip-summary .sum-hl {
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.15);
+}
+.tooltip-content {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a1a1aa;
+}
+.tooltip-content .content-para {
+  font-size: 12px;
+  margin: 3px 0;
+  text-indent: 1em;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--red);
+  color: white;
+  padding: 12px 24px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  z-index: 2000;
+  display: none;
+}
+.toast.show {
+  display: block;
+  animation: fadeInOut 3s forwards;
+}
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📚 Knowledge Tree Mind Map</h1>
+    <div class="controls" id="headerControls" style="display:none;">
+      <div class="control-group">
+        <label for="layoutSelect">Layout:</label>
+        <select id="layoutSelect">
+          <option value="LR" selected>Left-Right</option>
+          <option value="RL">Right-Left</option>
+          <option value="TB">Top-Bottom</option>
+          <option value="BT">Bottom-Top</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="expandLevel">Expand:</label>
+        <select id="expandLevel">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </div>
+      <button class="primary" onclick="fitView()">Fit View</button>
+      <button class="primary" onclick="expandAll()">Expand All</button>
+      <button class="primary" onclick="collapseAll()">Collapse All</button>
+      <button class="primary" onclick="resetAndUpload()">📄 New Upload</button>
+      <button class="primary" id="exportBtn" onclick="exportMindmap()" style="display:none;">📦 Export</button>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div id="chart" class="loading-placeholder">
+      <span class="big-icon">📂</span>
+      <span>Upload one or more PDFs to generate the Knowledge Tree Mind Map</span>
+    </div>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <button class="close-btn" onclick="closePanel()">&times;</button>
+    <div id="infoContent"></div>
+  </div>
+</div>
+
+<!-- ── Upload Overlay ── -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-box" id="uploadBox">
+    <span class="icon">📄</span>
+    <h2>Upload PDFs</h2>
+    <p>Upload one or more PDF documents. PDFs smaller than 200MB are processed directly, while larger PDFs are split before OCR and tree building.</p>
+    <label class="file-input-label" for="fileInput">Select PDF Files</label>
+    <input type="file" id="fileInput" accept=".pdf" multiple>
+    <div class="selected-file" id="selectedFile">
+      <span>📎</span>
+      <span class="file-name" id="fileName"></span>
+      <span class="file-size" id="fileSize"></span>
+    </div>
+    <button class="start-btn" id="startBtn" onclick="startProcessing()">🚀 Start Processing</button>
+    <p class="upload-hint">Supports multiple PDFs and drag &amp; drop. PDFs under 200MB stay whole; larger files are split by chapters when possible.
+      <br>The final tree preserves the PDF order and adds cross-document context links.</p>
+  </div>
+</div>
+
+<!-- ── Progress Overlay ── -->
+<div class="progress-overlay hidden" id="progressOverlay">
+  <div class="progress-panel">
+    <h2>⏳ Processing...</h2>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressBar"></div>
+    </div>
+    <div class="progress-stages">
+      <div class="progress-stage" id="stage-splitting">
+        <div class="dot"></div>
+        <div class="stage-label">Split<br>Split PDF</div>
+      </div>
+      <div class="progress-stage" id="stage-ocr_converting">
+        <div class="dot"></div>
+        <div class="stage-label">OCR<br>Text Recognition</div>
+      </div>
+      <div class="progress-stage" id="stage-building_tree">
+        <div class="dot"></div>
+        <div class="stage-label">Build<br>Build Tree</div>
+      </div>
+      <div class="progress-stage" id="stage-ai_enhancing">
+        <div class="dot"></div>
+        <div class="stage-label">AI<br>AI Enhancement</div>
+      </div>
+      <div class="progress-stage" id="stage-complete">
+        <div class="dot"></div>
+        <div class="stage-label">Done<br>Complete</div>
+      </div>
+    </div>
+    <div class="progress-message" id="progressMessage">
+      <span class="spinner-small"></span>Preparing...
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API_BASE = window.location.origin || 'http://localhost:8700';
+
+let chart = null;
+let treeData = null;
+let allNodes = [];
+let currentLayout = 'LR';
+let currentExpandLevel = 2;
+let selectedFiles = [];
+let currentTaskId = null;
+
+const STAGE_LABELS = {
+  splitting: 'Splitting PDF by chapters...',
+  ocr_converting: 'Text recognition via MinerU...',
+  building_tree: 'Building knowledge tree...',
+  ai_enhancing: 'AI enhancement in progress...',
+  merging: 'Preparing final data...',
+  complete: 'Processing complete!'
+};
+
+const LEVEL_COLORS = [
+  '#6366f1', '#818cf8', '#22c55e', '#eab308', '#f97316', '#a78bfa'
+];
+
+function getNodeColor(level) {
+  return LEVEL_COLORS[Math.min(level, LEVEL_COLORS.length - 1)];
+}
+
+// ── File Upload ──
+
+const uploadOverlay = document.getElementById('uploadOverlay');
+const uploadBox = document.getElementById('uploadBox');
+const fileInput = document.getElementById('fileInput');
+const selectedFileEl = document.getElementById('selectedFile');
+const fileNameEl = document.getElementById('fileName');
+const fileSizeEl = document.getElementById('fileSize');
+const startBtn = document.getElementById('startBtn');
+
+fileInput.addEventListener('change', (e) => {
+  const files = Array.from(e.target.files).filter(file => file.type === 'application/pdf');
+  setSelectedFiles(files);
+});
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function setSelectedFiles(files) {
+  selectedFiles = files;
+  if (!selectedFiles.length) {
+    selectedFileEl.style.display = 'none';
+    startBtn.style.display = 'none';
+    return;
+  }
+
+  const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+  const previewNames = selectedFiles.slice(0, 3).map(file => file.name).join(' | ');
+  const moreText = selectedFiles.length > 3 ? ` | +${selectedFiles.length - 3} more` : '';
+  fileNameEl.textContent = selectedFiles.length === 1 ? selectedFiles[0].name : `${selectedFiles.length} PDFs selected`;
+  fileSizeEl.textContent = `${formatSize(totalBytes)} | ${previewNames}${moreText}`;
+  selectedFileEl.style.display = 'flex';
+  startBtn.style.display = 'inline-block';
+}
+
+// Drag and drop
+uploadBox.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadBox.classList.add('drag-over');
+});
+uploadBox.addEventListener('dragleave', () => {
+  uploadBox.classList.remove('drag-over');
+});
+uploadBox.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadBox.classList.remove('drag-over');
+  const files = Array.from(e.dataTransfer.files).filter(file => file.type === 'application/pdf');
+  if (files.length > 0) {
+    setSelectedFiles(files);
+  } else {
+    showToast('Please upload a PDF file');
+  }
+});
+
+// ── Processing ──
+
+async function startProcessing() {
+  if (!selectedFiles.length) return;
+
+  uploadOverlay.classList.add('hidden');
+  const progressOverlay = document.getElementById('progressOverlay');
+  progressOverlay.classList.remove('hidden');
+
+  resetStages();
+  updateProgress(0, 'splitting', `Uploading ${selectedFiles.length} PDF(s)...`);
+
+  try {
+    const formData = new FormData();
+    selectedFiles.forEach(file => formData.append('files', file));
+
+    const uploadRes = await fetch(`${API_BASE}/api/upload`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error(`Upload failed: ${uploadRes.status}`);
+    }
+
+    const { task_id } = await uploadRes.json();
+    currentTaskId = task_id;
+    await pollTask(task_id);
+
+  } catch (err) {
+    updateProgress(0, '', `Error: ${err.message}`);
+    showToast(`Processing failed: ${err.message}`);
+    setTimeout(() => {
+      progressOverlay.classList.add('hidden');
+      uploadOverlay.classList.remove('hidden');
+    }, 2000);
+  }
+}
+
+async function pollTask(taskId) {
+  while (true) {
+    try {
+      const res = await fetch(`${API_BASE}/api/status/${taskId}`);
+      if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
+
+      const data = await res.json();
+
+      if (data.status === 'error') {
+        throw new Error(data.error || 'Unknown error');
+      }
+
+      updateProgress(data.progress, data.stage, data.messages?.[data.messages.length - 1] || '');
+
+      if (data.status === 'done') {
+        await loadResult(taskId);
+        return;
+      }
+    } catch (err) {
+      throw err;
+    }
+    await sleep(800);
+  }
+}
+
+async function loadResult(taskId) {
+  const res = await fetch(`${API_BASE}/api/result/${taskId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to load result: ${res.status}`);
+  }
+
+  const data = await res.json();
+  treeData = data;
+  allNodes = [];
+  flattenNodes(treeData, []);
+
+  const totalNodes = allNodes.length;
+  const parts = (treeData.children || []).length;
+  const enhanced = allNodes.filter(n => n.node.summary && n.node.summary.length > 0).length;
+  document.getElementById('stats').textContent = `Nodes: ${totalNodes} | PDFs: ${parts} | Enhanced: ${enhanced}`;
+
+  document.getElementById('progressOverlay').classList.add('hidden');
+  document.getElementById('headerControls').style.display = 'flex';
+  document.getElementById('exportBtn').style.display = 'inline-block';
+  document.getElementById('chart').classList.remove('loading-placeholder');
+  document.getElementById('chart').innerHTML = '';
+
+  initChart();
+  renderChart(currentLayout, currentExpandLevel);
+}
+
+function resetAndUpload() {
+  treeData = null;
+  allNodes = [];
+  selectedFiles = [];
+  currentTaskId = null;
+  if (chart) {
+    chart.dispose();
+    chart = null;
+  }
+
+  document.getElementById('headerControls').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('chart').classList.add('loading-placeholder');
+  document.getElementById('chart').innerHTML = '<span class="big-icon">📂</span><span>Upload one or more PDFs to generate the Knowledge Tree Mind Map</span>';
+  document.getElementById('stats').textContent = '';
+  document.getElementById('infoPanel').classList.remove('show');
+
+  fileInput.value = '';
+  selectedFileEl.style.display = 'none';
+  startBtn.style.display = 'none';
+  uploadOverlay.classList.remove('hidden');
+}
+
+function updateProgress(progress, stage, message) {
+  document.getElementById('progressBar').style.width = progress + '%';
+  document.getElementById('progressMessage').innerHTML =
+    `<span class="spinner-small"></span>${message || STAGE_LABELS[stage] || ''} (${Math.round(progress)}%)`;
+
+  resetStages();
+  const stageMap = {
+    splitting: 'stage-splitting',
+    ocr_converting: 'stage-ocr_converting',
+    building_tree: 'stage-building_tree',
+    ai_enhancing: 'stage-ai_enhancing',
+  };
+
+  let foundActive = false;
+  for (const [key, elId] of Object.entries(stageMap)) {
+    const el = document.getElementById(elId);
+    if (!foundActive && key === stage && progress < 90) {
+      el.classList.add('active');
+      foundActive = true;
+    } else if (!foundActive) {
+      el.classList.add('done');
+    }
+  }
+
+  if (progress >= 90) {
+    document.getElementById('stage-complete').classList.add('done');
+  }
+}
+
+function resetStages() {
+  document.querySelectorAll('.progress-stage').forEach(el => {
+    el.classList.remove('active', 'done');
+  });
+}
+
+// ── Mind Map Rendering (from tree_mindmap.html) ──
+
+function formatSummary(summary, keywords, maxLen) {
+  if (!summary) return '';
+  var text = summary;
+  if (maxLen > 0 && text.length > maxLen) {
+    text = text.substring(0, maxLen) + '\u2026';
+  }
+  var sentences = text.split(/(?<=[。；])/);
+  var groupSize = 3;
+  var html = '';
+  for (var i = 0; i < sentences.length; i += groupSize) {
+    var chunk = sentences.slice(i, i + groupSize).join('');
+    if (keywords && keywords.length > 0) {
+      keywords.forEach(function(kw) {
+        if (kw.length >= 2) {
+          var escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var regex = new RegExp('(' + escaped + ')', 'g');
+          chunk = chunk.replace(regex, '<span class="sum-hl">$1</span>');
+        }
+      });
+    }
+    html += '<p class="sum-para">' + chunk + '</p>';
+  }
+  return html;
+}
+
+function formatContent(text, keywords, maxLen) {
+  if (!text) return '';
+  var t = text;
+  if (maxLen > 0 && t.length > maxLen) {
+    t = t.substring(0, maxLen) + '\u2026';
+  }
+  var lines = t.split(/\n+/).filter(function(l) { return l.trim(); });
+  if (lines.length === 0) return '';
+  var html = '';
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (keywords && keywords.length > 0) {
+      keywords.forEach(function(kw) {
+        if (kw.length >= 2) {
+          var escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          var regex = new RegExp('(' + escaped + ')', 'g');
+          line = line.replace(regex, '<span class="sum-hl">$1</span>');
+        }
+      });
+    }
+    html += '<p class="content-para">' + line + '</p>';
+  }
+  return html;
+}
+
+function transformNode(node, depth) {
+  depth = depth || 0;
+  var name = node.title || node.name || 'Untitled';
+  var transformed = {
+    name: name,
+    title: node.title || node.name,
+    level: node.level != null ? node.level : depth,
+    depth: depth,
+    summary: node.summary || '',
+    keywords: node.keywords || [],
+    exam_points: node.exam_points || [],
+    content: node.content || '',
+    children: []
+  };
+
+  if (node.children && Array.isArray(node.children) && node.children.length > 0) {
+    transformed.children = node.children.map(function(child) {
+      return transformNode(child, depth + 1);
+    });
+  }
+
+  return transformed;
+}
+
+function flattenNodes(node, path, depth) {
+  depth = depth || 0;
+  path = path || [];
+  var currentPath = path.concat([node.name]);
+  allNodes.push({ node: node, path: currentPath, depth: depth });
+  if (node.children) {
+    for (var i = 0; i < node.children.length; i++) {
+      flattenNodes(node.children[i], currentPath, depth + 1);
+    }
+  }
+}
+
+function initChart() {
+  var chartContainer = document.getElementById('chart');
+  if (chart) chart.dispose();
+  chart = echarts.init(chartContainer, null, { renderer: 'canvas' });
+
+  document.getElementById('layoutSelect').onchange = function(e) {
+    currentLayout = e.target.value;
+    renderChart(currentLayout, currentExpandLevel);
+  };
+  document.getElementById('expandLevel').onchange = function(e) {
+    currentExpandLevel = parseInt(e.target.value);
+    renderChart(currentLayout, currentExpandLevel);
+  };
+  chart.on('click', function(params) {
+    if (params.componentSubType === 'tree') {
+      showNodeInfo(params.data);
+    }
+  });
+  window.addEventListener('resize', function() {
+    if (chart) chart.resize();
+  });
+}
+
+function getLabelPosition(layout) {
+  if (layout === 'LR') return 'right';
+  if (layout === 'RL') return 'left';
+  if (layout === 'TB') return 'bottom';
+  return 'top';
+}
+
+function getLeafLabelPosition(layout) {
+  if (layout === 'LR') return 'right';
+  if (layout === 'RL') return 'left';
+  if (layout === 'TB') return 'bottom';
+  return 'top';
+}
+
+function renderChart(layout, expandLevel) {
+  if (!chart || !treeData) return;
+  var isHorizontal = layout === 'LR' || layout === 'RL';
+
+  // Transform data for ECharts
+  var transformed = transformNode(treeData);
+
+  var option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      triggerOn: 'mousemove',
+      confine: false,
+      backgroundColor: 'rgba(15, 17, 23, 0.96)',
+      borderColor: 'rgba(99, 102, 241, 0.3)',
+      borderWidth: 1,
+      padding: [12, 16],
+      textStyle: { color: '#e4e4e7', fontSize: 12, lineHeight: 20 },
+      extraCssText: 'white-space: normal; word-wrap: break-word; overflow-wrap: break-word;',
+      formatter: function(params) {
+        if (params.componentSubType !== 'tree') return '';
+        var d = params.data;
+        var html = '<div style="max-width: 480px; word-wrap: break-word; overflow-wrap: break-word;">';
+        html += '<div style="font-size:14px;font-weight:700;color:#818cf8;margin-bottom:6px;">' + d.name + '</div>';
+
+        if (d.level != null) {
+          html += '<span style="font-size:10px;color:#71717a;">Level ' + d.level + '</span>';
+        }
+
+        if (d.summary) {
+          html += '<div class="tooltip-summary" style="margin-top:8px;">' + formatSummary(d.summary, d.keywords, 0) + '</div>';
+        }
+
+        if (d.keywords && d.keywords.length > 0) {
+          html += '<div style="margin-top:8px;">';
+          html += d.keywords.map(function(k) {
+            return '<span style="display:inline-block;background:rgba(99,102,241,0.12);color:#818cf8;padding:1px 6px;border-radius:3px;font-size:10px;margin:1px 2px;">' + k + '</span>';
+          }).join('');
+          html += '</div>';
+        }
+
+        if (d.exam_points && d.exam_points.length > 0) {
+          html += '<div style="margin-top:8px;border-top:1px solid rgba(99,102,241,0.15);padding-top:6px;">';
+          d.exam_points.forEach(function(ep) {
+            var freqColor = ep.frequency === '\u9ad8\u9891' ? '#22c55e' : ep.frequency === '\u4e2d\u9891' ? '#eab308' : '#71717a';
+            html += '<div style="font-size:11px;margin:3px 0;"><span style="color:' + freqColor + ';">' + (ep.frequency || '') + '</span> <span style="color:#71717a;">[' + (ep.type || '') + ']</span> ' + ep.point + '</div>';
+          });
+          html += '</div>';
+        }
+
+        if (d.content && !String(d.content).startsWith('graph')) {
+          html += '<div class="tooltip-content" style="margin-top:6px;border-top:1px solid rgba(99,102,241,0.15);padding-top:6px;">' + formatContent(d.content, d.keywords, 0) + '</div>';
+        }
+
+        if (d.children && d.children.length > 0) {
+          html += '<div style="margin-top:6px;font-size:10px;color:#71717a;">' + d.children.length + ' child nodes</div>';
+        }
+
+        html += '</div>';
+        return html;
+      }
+    },
+    series: [{
+      type: 'tree',
+      data: [transformed],
+      top: '4%',
+      left: isHorizontal ? '8%' : '8%',
+      right: isHorizontal ? '20%' : '8%',
+      bottom: '4%',
+      orient: layout,
+      symbol: 'circle',
+      symbolSize: function(value, params) {
+        var d = params.data;
+        var level = d.level || 0;
+        if (level === 0) return [20, 20];
+        if (level === 1) return [14, 14];
+        if (level === 2) return [10, 10];
+        return [7, 7];
+      },
+      initialTreeDepth: expandLevel,
+      expandAndCollapse: true,
+      animationDuration: 500,
+      animationDurationUpdate: 500,
+      animationEasing: 'cubicOut',
+      roam: true,
+      itemStyle: {
+        borderWidth: 1.5,
+        borderColor: function(params) {
+          return getNodeColor(params.data.level || 0) + '80';
+        },
+        color: function(params) {
+          return getNodeColor(params.data.level || 0);
+        }
+      },
+      label: {
+        position: getLabelPosition(layout),
+        verticalAlign: 'middle',
+        align: 'left',
+        fontSize: 12,
+        color: '#e4e4e7',
+        fontWeight: 500,
+        formatter: function(params) {
+          var d = params.data;
+          var name = d.name || '';
+          if (d.summary && d.summary.length > 0 && d.level > 0) {
+            return '{enhanced|} ' + name;
+          }
+          return name;
+        },
+        rich: {
+          enhanced: {
+            backgroundColor: 'rgba(34, 197, 94, 0.3)',
+            borderRadius: 3,
+            width: 4,
+            height: 4
+          }
+        }
+      },
+      leaves: {
+        label: {
+          position: getLeafLabelPosition(layout),
+          verticalAlign: 'middle',
+          align: 'left',
+          fontSize: 11,
+          color: '#a1a1aa'
+        }
+      },
+      lineStyle: {
+        color: 'rgba(99, 102, 241, 0.2)',
+        width: 1.5,
+        curveness: 0.5
+      },
+      emphasis: {
+        itemStyle: {
+          color: '#fbbf24',
+          borderColor: '#fbbf24',
+          borderWidth: 2,
+          shadowBlur: 12,
+          shadowColor: 'rgba(251, 191, 36, 0.3)'
+        },
+        label: {
+          color: '#fbbf24',
+          fontWeight: 'bold',
+          fontSize: 13
+        }
+      },
+      edgeShape: 'curve'
+    }]
+  };
+
+  chart.setOption(option, true);
+}
+
+// ── Info Panel ──
+
+function showNodeInfo(d) {
+  var panel = document.getElementById('infoPanel');
+  var content = document.getElementById('infoContent');
+  var html = '<div class="node-title">' + d.name + '</div>';
+
+  if (d.level != null) {
+    html += '<span style="font-size:11px;color:var(--text3);">Level ' + d.level + '</span>';
+  }
+
+  if (d.summary) {
+    html += '<div class="field-label">Summary</div>';
+    html += '<div class="summary">' + formatSummary(d.summary, d.keywords, 0) + '</div>';
+  }
+
+  if (d.keywords && d.keywords.length > 0) {
+    html += '<div class="field-label">Keywords</div>';
+    html += '<div class="keywords">';
+    html += d.keywords.map(function(k) { return '<span class="keyword-tag">' + k + '</span>'; }).join('');
+    html += '</div>';
+  }
+
+  if (d.exam_points && d.exam_points.length > 0) {
+    html += '<div class="field-label">Exam Points</div>';
+    d.exam_points.forEach(function(ep) {
+      var freqColor = ep.frequency === '\u9ad8\u9891' ? 'var(--green)' :
+                       ep.frequency === '\u4e2d\u9891' ? 'var(--yellow)' : 'var(--text3)';
+      html += '<div class="exam-point">' + ep.point +
+        '<div class="exam-meta"><span style="color:' + freqColor + ';">' + (ep.frequency || '-') + '</span> \u00b7 ' + (ep.type || '-') + '</div></div>';
+    });
+  }
+
+  if (d.content && d.content.length > 0 && !String(d.content).startsWith('graph')) {
+    html += '<div class="field-label">Content</div>';
+    html += '<div>' + formatContent(d.content, d.keywords, 0) + '</div>';
+  }
+
+  if (d.children && d.children.length > 0) {
+    html += '<div style="margin-top:10px;font-size:11px;color:var(--text3);">' + d.children.length + ' child node(s)</div>';
+  }
+
+  content.innerHTML = html;
+  panel.classList.add('show');
+}
+
+function closePanel() {
+  document.getElementById('infoPanel').classList.remove('show');
+}
+
+// ── Controls ──
+
+function fitView() {
+  if (!chart) return;
+  renderChart(currentLayout, currentExpandLevel);
+}
+
+function expandAll() {
+  if (!chart) return;
+  currentExpandLevel = 5;
+  document.getElementById('expandLevel').value = '5';
+  renderChart(currentLayout, 5);
+}
+
+function collapseAll() {
+  if (!chart) return;
+  currentExpandLevel = 1;
+  document.getElementById('expandLevel').value = '1';
+  renderChart(currentLayout, 1);
+}
+
+// ── Export ──
+
+async function exportMindmap() {
+  if (!currentTaskId) {
+    showToast('No task to export');
+    return;
+  }
+  var btn = document.getElementById('exportBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Exporting...';
+
+  try {
+    var res = await fetch(`${API_BASE}/api/export/${currentTaskId}`);
+    if (!res.ok) {
+      var errorMessage = 'Export failed';
+      try {
+        var err = await res.json();
+        errorMessage = err.error || err.detail || errorMessage;
+      } catch (_) {
+        var text = await res.text().catch(function() { return ''; });
+        if (text) errorMessage = text;
+      }
+      throw new Error(errorMessage);
+    }
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'knowledge_tree_' + currentTaskId + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Export downloaded! Unzip to get chapters/, md/, json/, and mindmap.html.');
+  } catch (err) {
+    showToast('Export failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📦 Export';
+  }
+}
+
+// ── Helpers ──
+
+function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+function showToast(msg) {
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(function() { toast.classList.remove('show'); }, 3000);
+}
+</script>
+</body>
+</html>

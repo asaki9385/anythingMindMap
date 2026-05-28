@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Sensitive credentials
+key
+
+# Temp uploads
+knowledge-compiler/data/_temp_uploads/
+
+# Environment files
+.env
+
+# Claude config
+.claude/
+
+# IDE
+.vscode/
+.idea/
