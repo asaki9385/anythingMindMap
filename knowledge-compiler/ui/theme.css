@@ -100,6 +100,11 @@
   --tooltip-divider: rgba(232,168,76,0.15);
   --keyword-bg: rgba(232,168,76,0.12);
   --keyword-color: #e8a84c;
+  --tag-accent-bg: rgba(232,168,76,0.15);
+  --tag-teal-bg: rgba(58,168,143,0.15);
+  --tag-danger-bg: rgba(232,84,84,0.15);
+  --tag-success-bg: rgba(78,184,104,0.15);
+  --focus-ring: rgba(232,168,76,0.15);
 }
 
 /* ── Light Mode ── */
@@ -148,6 +153,11 @@
   --tooltip-divider: rgba(192,122,46,0.15);
   --keyword-bg: rgba(192,122,46,0.1);
   --keyword-color: #c07a2e;
+  --tag-accent-bg: rgba(192,122,46,0.1);
+  --tag-teal-bg: rgba(42,125,110,0.1);
+  --tag-danger-bg: rgba(196,64,64,0.1);
+  --tag-success-bg: rgba(58,138,80,0.1);
+  --focus-ring: rgba(192,122,46,0.15);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -211,7 +221,10 @@ button {
   cursor: pointer;
   font-weight: var(--weight-medium);
   line-height: 1.4;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
 }
 
 button:hover {
@@ -301,7 +314,7 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(232,168,76,0.15);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 input::placeholder,
@@ -330,10 +343,10 @@ textarea {
   color: var(--keyword-color);
 }
 
-.tag--accent { background: rgba(232,168,76,0.15); color: var(--accent); }
-.tag--teal { background: rgba(58,168,143,0.15); color: var(--accent-secondary); }
-.tag--danger { background: rgba(232,84,84,0.15); color: var(--danger); }
-.tag--success { background: rgba(78,184,104,0.15); color: var(--success); }
+.tag--accent { background: var(--tag-accent-bg); color: var(--accent); }
+.tag--teal { background: var(--tag-teal-bg); color: var(--accent-secondary); }
+.tag--danger { background: var(--tag-danger-bg); color: var(--danger); }
+.tag--success { background: var(--tag-success-bg); color: var(--success); }
 
 /* ════════════════════════════════════════════════════════════════
    Cards & Panels
