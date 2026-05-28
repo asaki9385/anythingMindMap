@@ -1791,7 +1791,7 @@ function renderChart(layout, expandLevel, targetPath) {
       borderWidth: 0,
       padding: 0,
       textStyle: { color: '#e8e0d8', fontSize: 12, lineHeight: 20 },
-      extraCssText: 'white-space: normal; word-wrap: break-word; overflow-wrap: break-word;',
+      extraCssText: 'white-space: normal; word-wrap: break-word; overflow-wrap: break-word; backface-visibility: hidden; -webkit-font-smoothing: antialiased;',
       formatter: function(params) {
         if (params.componentSubType !== 'tree') return '';
         var d = params.data;
@@ -2155,7 +2155,7 @@ function enterContentEdit() {
   var btn = document.getElementById('contentEditBtn');
 
   var raw = currentDisplayNode.content || '';
-  editable.innerHTML = KT.escapeHtml(raw).replace(/\n/g, '<br>');
+  editable.innerHTML = KT.markdownToHtml(raw).replace(/\n/g, '<br>');
 
   display.classList.add('hidden');
   editorWrap.classList.add('active');
@@ -2176,7 +2176,7 @@ function cancelContentEdit() {
 async function saveContentEdit() {
   if (!currentDisplayNode) return;
   var editable = document.getElementById('contentEditable');
-  var newText = editable.innerText.trim();
+  var newText = KT.htmlToMarkdown(editable.innerHTML).trim();
 
   currentDisplayNode.content = newText;
 
