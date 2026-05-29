@@ -984,16 +984,20 @@ async def api_result(task_id: str):
     with tasks_lock:
         task = tasks.get(task_id)
 
-    if task is None:
-        return JSONResponse({"error": "Task not found"}, status_code=404)
+    if task is not None:
+        if task.status == "error":
+            return JSONResponse({"error": task.error, "messages": task.messages}, status_code=500)
+        if task.status != "done":
+            return JSONResponse({"status": task.status, "progress": task.progress}, status_code=202)
+        return JSONResponse(task.result)
 
-    if task.status == "error":
-        return JSONResponse({"error": task.error, "messages": task.messages}, status_code=500)
+    # Fallback: try loading from disk
+    json_path = os.path.join(TEMP_DIR, task_id, "json", "knowledge_tree.json")
+    if os.path.isfile(json_path):
+        with open(json_path, encoding="utf-8") as f:
+            return JSONResponse(json.load(f))
 
-    if task.status != "done":
-        return JSONResponse({"status": task.status, "progress": task.progress}, status_code=202)
-
-    return JSONResponse(task.result)
+    return JSONResponse({"error": "Task not found"}, status_code=404)
 
 
 @app.get("/api/export/{task_id}")
@@ -1192,11 +1196,23 @@ async def api_files():
             if f.endswith(".json"):
                 fpath = os.path.join(enhanced_dir, f)
                 stat = os.stat(fpath)
+
+                # Count nodes
+                node_count = 0
+                try:
+                    with open(fpath, encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    node_count = _count_nodes(data)
+                except Exception:
+                    pass
+
                 files.append({
                     "filename": f,
                     "source": "enhanced",
                     "size": stat.st_size,
                     "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "original_files": [],
+                    "node_count": node_count,
                 })
 
     # From completed tasks
@@ -1205,12 +1221,33 @@ async def api_files():
             json_path = os.path.join(TEMP_DIR, task_dir, "json", "knowledge_tree.json")
             if os.path.isfile(json_path):
                 stat = os.stat(json_path)
+
+                # Find original uploaded filenames
+                uploads_dir = os.path.join(TEMP_DIR, task_dir, "uploads")
+                original_files = []
+                if os.path.isdir(uploads_dir):
+                    for uf in sorted(os.listdir(uploads_dir)):
+                        # Remove index prefix like "01_"
+                        clean_name = re.sub(r'^\d+_', '', uf)
+                        original_files.append(clean_name)
+
+                # Count nodes in the tree
+                node_count = 0
+                try:
+                    with open(json_path, encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    node_count = _count_nodes(data)
+                except Exception:
+                    pass
+
                 files.append({
                     "filename": f"task_{task_dir}",
                     "task_id": task_dir,
                     "source": "task",
                     "size": stat.st_size,
                     "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "original_files": original_files,
+                    "node_count": node_count,
                 })
 
     return {"files": files}

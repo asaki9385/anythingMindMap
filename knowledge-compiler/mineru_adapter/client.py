@@ -6,25 +6,53 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-TOKEN = "eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.eyJqdGkiOiI3MzAwMDEzMCIsInJvbCI6IlJPTEVfUkVHSVNURVIiLCJpc3MiOiJPcGVuWExhYiIsImlhdCI6MTc3ODY1OTE5NywiY2xpZW50SWQiOiJsa3pkeDU3bnZ5MjJqa3BxOXgydyIsInBob25lIjoiIiwib3BlbklkIjpudWxsLCJ1dWlkIjoiYmIxMWNlYzktNTJkOC00OGJhLWEyODMtM2UxZDYwMDgwN2ExIiwiZW1haWwiOiIiLCJleHAiOjE3ODY0MzUxOTd9.2fwiDtQMPqr3Mx4TgojTjchdHTmA6k3r5EGD49QZXUbqRfytN6Oxv0Bj0nqmdnnyNhjBBs0G4RVvfmRA1gWE1Q"
 BASE_URL = "https://mineru.net"
-HEADERS = {
-    "Content-Type": "application/json",
-    "Authorization": f"Bearer {TOKEN}"
-}
 
 
-def upload_and_process_all(pdf_paths: list, is_ocr: bool = True) -> list:
+def detect_language(filename: str, sample_text: str | None = None) -> str:
+    """Detect document language for MinerU processing.
+    Returns 'ch' for Chinese, 'en' for English.
+
+    Checks sample_text first (if provided), then falls back to filename.
+    """
+    source = (sample_text or '') + ' ' + filename
+    for ch in source:
+        if '一' <= ch <= '鿿' or '㐀' <= ch <= '䶿':
+            return "ch"
+    return "en"
+
+
+def _build_headers(token: str) -> dict:
+    return {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}"
+    }
+
+
+def upload_and_process_all(pdf_paths: list, is_ocr: bool = True, token: str | None = None) -> list:
     """Batch upload PDFs and process in parallel."""
+    if token is None:
+        token = os.environ.get("MINERU_TOKEN", "")
+    if not token:
+        raise ValueError("MinerU token is required. Set MINERU_TOKEN env var or pass the token parameter.")
+    headers = _build_headers(token)
+
     # Step 1: Get presigned upload URLs
     files_meta = [
-        {"name": os.path.basename(p), "data_id": f"part_{i:03d}", "is_ocr": is_ocr}
+        {
+            "name": os.path.basename(p),
+            "data_id": f"part_{i:03d}",
+            "is_ocr": is_ocr,
+            "enable_table": True,
+            "enable_formula": True,
+            "language": detect_language(os.path.basename(p)),
+        }
         for i, p in enumerate(pdf_paths)
     ]
 
     res = requests.post(
         f"{BASE_URL}/api/v4/file-urls/batch",
-        headers=HEADERS,
+        headers=headers,
         json={"files": files_meta, "model_version": "vlm"}
     )
     result = res.json()
@@ -52,16 +80,22 @@ def upload_and_process_all(pdf_paths: list, is_ocr: bool = True) -> list:
 
     # Step 3: Poll batch result (auto-submitted after upload)
     print("Waiting for MinerU to process...")
-    return poll_batch(batch_id)
+    return poll_batch(batch_id, token=token)
 
 
-def poll_batch(batch_id: str, interval: int = 5, timeout: int = 900) -> list:
+def poll_batch(batch_id: str, interval: int = 5, timeout: int = 900, token: str | None = None) -> list:
     """Poll batch until all done or failed."""
+    if token is None:
+        token = os.environ.get("MINERU_TOKEN", "")
+    if not token:
+        raise ValueError("MinerU token is required. Set MINERU_TOKEN env var or pass the token parameter.")
+    headers = _build_headers(token)
+
     url = f"{BASE_URL}/api/v4/extract-results/batch/{batch_id}"
     start = time.time()
 
     while time.time() - start < timeout:
-        res = requests.get(url, headers=HEADERS)
+        res = requests.get(url, headers=headers)
         data = res.json()["data"]
         files = data["extract_result"]
 

@@ -1,20 +1,37 @@
-# Python cache
+# Data files
+knowledge-compiler/data/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
-
-# Sensitive credentials
-key
-
-# Temp uploads
-knowledge-compiler/data/_temp_uploads/
-
-# Environment files
-.env
-
-# Claude config
-.claude/
+*.egg-info/
 
 # IDE
+.vs/
 .vscode/
 .idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Dev tools
+.agents/
+.claude/
+.superpowers/
+docs/
+
+# Root extras
+all_source_code.txt
+check_deployment.py
+demo_complete_pipeline.py
+test_advanced_processing.py
+test_document_processing.py
+nginx.conf
+skills-lock.json
+*.pdf

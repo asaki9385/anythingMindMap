@@ -13,18 +13,18 @@ var LEVEL_COLORS_DARK  = ['#e8a84c', '#3aa88f', '#7a9dd0', '#a888cc', '#e85454']
 // ── Theme ──
 
 function getTheme() {
-  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 
 function toggleTheme() {
   var html = document.documentElement;
-  var isLight = html.getAttribute('data-theme') === 'light';
-  if (isLight) {
+  var isDark = html.getAttribute('data-theme') === 'dark';
+  if (isDark) {
     html.removeAttribute('data-theme');
-    localStorage.setItem('kt-theme', 'dark');
-  } else {
-    html.setAttribute('data-theme', 'light');
     localStorage.setItem('kt-theme', 'light');
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    localStorage.setItem('kt-theme', 'dark');
   }
   updateThemeUI();
   return getTheme();
@@ -32,18 +32,18 @@ function toggleTheme() {
 
 function initTheme() {
   var saved = localStorage.getItem('kt-theme');
-  if (saved === 'light') {
-    document.documentElement.setAttribute('data-theme', 'light');
+  if (saved === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
   }
   updateThemeUI();
 }
 
 function updateThemeUI() {
-  var isLight = getTheme() === 'light';
+  var isDark = getTheme() === 'dark';
   var icon = document.getElementById('themeIcon');
   var label = document.getElementById('themeLabel');
-  if (icon) icon.textContent = isLight ? '☀️' : '🌙';
-  if (label) label.textContent = isLight ? 'Light' : 'Dark';
+  if (icon) icon.textContent = isDark ? '🌙' : '☀️';
+  if (label) label.textContent = isDark ? 'Dark' : 'Light';
 }
 
 // ── Color Helpers ──

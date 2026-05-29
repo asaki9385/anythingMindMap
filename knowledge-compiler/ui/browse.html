@@ -168,6 +168,7 @@ body::before {
   transform: translateY(-2px);
   border-color: var(--accent);
   box-shadow: var(--shadow-md), 0 0 0 1px var(--border-accent);
+  z-index: 100;
 }
 
 .browse-card:active {
@@ -410,12 +411,114 @@ body::before {
   }
 }
 
+/* Hide tooltips on touch devices */
+@media (hover: none) {
+  .card-tooltip {
+    display: none;
+  }
+}
+
+/* ── Tooltip ── */
+.browse-card {
+  position: relative;
+}
+
+.card-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  min-width: 220px;
+  max-width: 320px;
+  padding: var(--sp-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out);
+  z-index: 999;
+}
+
+.card-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: var(--border-strong);
+}
+
+.browse-card:hover .card-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-label {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--sp-1);
+}
+
+.tooltip-files {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--sp-3) 0;
+}
+
+.tooltip-files li {
+  font-size: var(--text-sm);
+  color: var(--ink);
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.tooltip-files li::before {
+  content: '📄';
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tooltip-stats {
+  display: flex;
+  gap: var(--sp-4);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.tooltip-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tooltip-stat-value {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.tooltip-stat-label {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
 /* ── Accessibility ── */
 @media (prefers-reduced-motion: reduce) {
   .browse-card {
     opacity: 1;
     transform: none;
     animation: none;
+  }
+  .card-tooltip {
+    transition: none;
   }
 }
 </style>
@@ -490,18 +593,18 @@ body::before {
 // ── Theme Management ──
 
 function getTheme() {
-  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 
 function toggleTheme() {
   var html = document.documentElement;
-  var isLight = html.getAttribute('data-theme') === 'light';
-  if (isLight) {
+  var isDark = html.getAttribute('data-theme') === 'dark';
+  if (isDark) {
     html.removeAttribute('data-theme');
-    localStorage.setItem('kt-theme', 'dark');
-  } else {
-    html.setAttribute('data-theme', 'light');
     localStorage.setItem('kt-theme', 'light');
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    localStorage.setItem('kt-theme', 'dark');
   }
   updateThemeUI();
   return getTheme();
@@ -509,18 +612,18 @@ function toggleTheme() {
 
 function initTheme() {
   var saved = localStorage.getItem('kt-theme');
-  if (saved === 'light') {
-    document.documentElement.setAttribute('data-theme', 'light');
+  if (saved === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
   }
   updateThemeUI();
 }
 
 function updateThemeUI() {
-  var isLight = getTheme() === 'light';
+  var isDark = getTheme() === 'dark';
   var icon = document.getElementById('themeIcon');
   var label = document.getElementById('themeLabel');
-  if (icon) icon.textContent = isLight ? '☀️' : '🌙';
-  if (label) label.textContent = isLight ? 'Light' : 'Dark';
+  if (icon) icon.textContent = isDark ? '🌙' : '☀️';
+  if (label) label.textContent = isDark ? 'Dark' : 'Light';
 }
 
 // ── Helpers ──
@@ -593,9 +696,7 @@ function createFileCard(file, index) {
   var displaySize = formatSize(file.size);
   var isTask = file.source === 'task';
 
-  var linkHref = isTask && file.task_id
-    ? '/ui/tree_mindmap.html?task=' + encodeURIComponent(file.task_id)
-    : '/ui/tree_mindmap.html?file=' + encodeURIComponent(file.filename);
+  var linkHref = '/ui/tree_mindmap.html?file=' + encodeURIComponent(file.filename);
 
   var iconClass = isTask ? 'card-icon--teal' : 'card-icon--amber';
   var iconSvg = isTask
@@ -605,6 +706,35 @@ function createFileCard(file, index) {
   var sourceBadge = isTask
     ? '<span class="source-badge">任务</span>'
     : '<span class="source-badge">本地</span>';
+
+  // Build tooltip content
+  var tooltipHtml = '';
+  var originalFiles = file.original_files || [];
+  var nodeCount = file.node_count || 0;
+
+  if (originalFiles.length > 0 || nodeCount > 0) {
+    var filesListHtml = '';
+    if (originalFiles.length > 0) {
+      var displayFiles = originalFiles.slice(0, 5);
+      filesListHtml = '<ul class="tooltip-files">' +
+        displayFiles.map(function(f) { return '<li>' + escapeHtml(f) + '</li>'; }).join('') +
+        (originalFiles.length > 5 ? '<li style="color:var(--ink-muted)">+' + (originalFiles.length - 5) + ' 个文件</li>' : '') +
+        '</ul>';
+    }
+
+    var statsHtml = '';
+    if (nodeCount > 0 || originalFiles.length > 0) {
+      statsHtml = '<div class="tooltip-stats">' +
+        (originalFiles.length > 0 ? '<div class="tooltip-stat"><span class="tooltip-stat-value">' + originalFiles.length + '</span><span class="tooltip-stat-label">源文件</span></div>' : '') +
+        (nodeCount > 0 ? '<div class="tooltip-stat"><span class="tooltip-stat-value">' + nodeCount + '</span><span class="tooltip-stat-label">节点</span></div>' : '') +
+        '</div>';
+    }
+
+    tooltipHtml = '<div class="card-tooltip">' +
+      (originalFiles.length > 0 ? '<div class="tooltip-label">原始文件</div>' + filesListHtml : '') +
+      statsHtml +
+      '</div>';
+  }
 
   var card = document.createElement('a');
   card.href = linkHref;
@@ -623,7 +753,8 @@ function createFileCard(file, index) {
         (relativeDate ? '<span class="card-meta-dot"></span><span class="card-meta-item">' + escapeHtml(relativeDate) + '</span>' : '') +
       '</div>' +
       sourceBadge +
-    '</div>';
+    '</div>' +
+    tooltipHtml;
 
   return card;
 }
@@ -633,7 +764,7 @@ function createTaskCard(task, index) {
   var relativeDate = formatRelativeDate(task.modified);
   var isDone = task.status === 'done';
 
-  var linkHref = '/ui/tree_mindmap.html?task=' + encodeURIComponent(task.task_id);
+  var linkHref = '/ui/tree_mindmap.html?file=' + encodeURIComponent('task_' + task.task_id);
 
   var iconClass = isDone ? 'card-icon--green' : 'card-icon--amber';
   var iconSvg = isDone

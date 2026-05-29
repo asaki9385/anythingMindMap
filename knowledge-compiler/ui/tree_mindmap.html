@@ -40,6 +40,13 @@ body { overflow: hidden; }
   white-space: nowrap;
   flex-shrink: 0;
 }
+.header-home-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.header-home-link:hover { opacity: 0.7; }
 .header-right {
   display: flex;
   align-items: center;
@@ -287,6 +294,55 @@ body { overflow: hidden; }
 .theme-toggle .icon { font-size: 16px; line-height: 1; }
 .theme-toggle .label { font-size: 12px; }
 
+/* ── Shared Range Slider ── */
+.range-track {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  background: var(--border-strong);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.2s;
+}
+.range-track:hover {
+  background: var(--ink-muted);
+}
+.range-track::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: 2.5px solid var(--surface);
+  cursor: pointer;
+  box-shadow: 0 1px 4px var(--shadow-color);
+  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+}
+.range-track::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+.range-track::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}
+.range-track::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: 2.5px solid var(--surface);
+  cursor: pointer;
+  box-shadow: 0 1px 4px var(--shadow-color);
+}
+.range-track::-moz-range-track {
+  background: var(--border-strong);
+  border-radius: 3px;
+  height: 5px;
+}
+
 /* ── Zoom Slider ── */
 .zoom-control {
   display: flex;
@@ -310,39 +366,10 @@ body { overflow: hidden; }
   color: var(--ink-muted);
   min-width: 36px;
   text-align: center;
+  font-family: var(--font-mono);
 }
 .zoom-control input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
   width: 100px;
-  height: 4px;
-  background: var(--border-strong);
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-  vertical-align: middle;
-}
-.zoom-control input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  background: var(--accent);
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-.zoom-control input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-}
-.zoom-control input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: var(--accent);
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-  cursor: pointer;
 }
 
 /* ── Content Editor ── */
@@ -727,36 +754,7 @@ body { overflow: hidden; }
   font-family: var(--font-mono);
 }
 .spacing-slider input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
   width: 120px;
-  height: 4px;
-  background: var(--border-strong);
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-}
-.spacing-slider input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  background: var(--accent);
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-.spacing-slider input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
-}
-.spacing-slider input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: var(--accent);
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-  cursor: pointer;
 }
 </style>
 </head>
@@ -764,7 +762,7 @@ body { overflow: hidden; }
 <div class="container">
   <div class="header">
     <div class="header-row-1">
-      <h1>Knowledge Tree Mind Map</h1>
+      <a href="/ui/homepage.html" class="header-home-link"><h1>Knowledge Tree Mind Map</h1></a>
       <div class="header-right">
         <div class="theme-toggle" id="themeToggle" onclick="handleThemeToggle()">
           <span class="icon" id="themeIcon">🌙</span>
@@ -772,7 +770,7 @@ body { overflow: hidden; }
         </div>
         <div class="zoom-control">
           <span class="zoom-icon">−</span>
-          <input type="range" id="zoomRange" min="25" max="300" value="100" step="5" />
+          <input type="range" class="range-track" id="zoomRange" min="25" max="300" value="100" step="5" />
           <span class="zoom-icon">+</span>
           <span class="zoom-label" id="zoomLabel">100%</span>
         </div>
@@ -826,7 +824,7 @@ body { overflow: hidden; }
     </div>
     <div class="search-status" id="searchStatus"></div>
   </div>
-  <div id="chartContainer" style="flex:1;position:relative;">
+  <div id="chartContainer" style="flex:1;position:relative;background:var(--canvas);">
     <div id="chart" class="loading">
       <span class="spinner"></span>
       <span>Loading knowledge tree...</span>
@@ -843,12 +841,12 @@ body { overflow: hidden; }
 <div class="spacing-slider" id="spacingSlider" title="Drag to adjust node spacing">
   <div class="spacing-row">
     <label class="spacing-label">Width</label>
-    <input type="range" id="spacingWidth" min="20" max="300" value="100" />
+    <input type="range" class="range-track" id="spacingWidth" min="20" max="300" value="100" />
     <span class="spacing-val" id="spacingWidthVal">100</span>
   </div>
   <div class="spacing-row">
     <label class="spacing-label">Height</label>
-    <input type="range" id="spacingHeight" min="20" max="300" value="100" />
+    <input type="range" class="range-track" id="spacingHeight" min="20" max="300" value="100" />
     <span class="spacing-val" id="spacingHeightVal">100</span>
   </div>
 </div>
@@ -857,9 +855,190 @@ body { overflow: hidden; }
 <script>
 // ── Theme ──
 KT.initTheme();
+applyThemeColors();
+
+function applyThemeColors() {
+  var d = KT.getTheme() === 'dark';
+  var c = {
+    canvas:      d ? '#1a1814' : '#faf8f5',
+    surface:     d ? '#242018' : '#ffffff',
+    raised:      d ? '#2e2820' : '#f5f0eb',
+    ink:         d ? '#e8e0d8' : '#2c1810',
+    ink2:        d ? '#a89888' : '#6b5b4e',
+    inkMuted:    d ? '#706050' : '#9a8b7e',
+    accent:      d ? '#e8a84c' : '#c07a2e',
+    accentH:     d ? '#f0bc6c' : '#a8681e',
+    border:      d ? 'rgba(232,224,216,0.08)' : 'rgba(44,24,16,0.1)',
+    borderS:     d ? 'rgba(232,224,216,0.15)' : 'rgba(44,24,16,0.2)',
+    borderA:     d ? 'rgba(232,168,76,0.3)' : 'rgba(192,122,46,0.3)',
+    focusRing:   d ? 'rgba(232,168,76,0.15)' : 'rgba(192,122,46,0.15)',
+    tagAccentBg: d ? 'rgba(232,168,76,0.15)' : 'rgba(192,122,46,0.1)',
+    keywordBg:   d ? 'rgba(232,168,76,0.12)' : 'rgba(192,122,46,0.1)',
+    keywordClr:  d ? '#e8a84c' : '#c07a2e',
+    shadow:      d ? '0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(44,24,16,0.08)',
+    shadowSm:    d ? '0 1px 3px rgba(0,0,0,0.15)' : '0 1px 3px rgba(44,24,16,0.06)',
+    shadowClr:   d ? 'rgba(0,0,0,0.2)' : 'rgba(44,24,16,0.06)',
+    danger:      d ? '#e85454' : '#c44040',
+    success:     d ? '#4eb868' : '#3a8a50',
+  };
+
+  // Body & chart
+  document.body.style.background = c.canvas;
+  document.body.style.color = c.ink;
+  var cc = document.getElementById('chartContainer');
+  if (cc) cc.style.background = c.canvas;
+
+  // Header
+  var hdr = document.querySelector('.header');
+  if (hdr) { hdr.style.background = c.surface; hdr.style.borderBottomColor = c.border; }
+
+  // H1 title link
+  var h1Link = document.querySelector('.header-home-link');
+  if (h1Link) h1Link.style.color = c.ink;
+
+  // Theme toggle button
+  var tt = document.getElementById('themeToggle');
+  if (tt) { tt.style.background = c.raised; tt.style.borderColor = c.border; tt.style.color = c.ink2; }
+
+  // Zoom control
+  var zc = document.querySelector('.zoom-control');
+  if (zc) { zc.style.background = c.raised; zc.style.borderColor = c.border; }
+  document.querySelectorAll('.zoom-icon, .zoom-label').forEach(function(el) {
+    el.style.color = c.inkMuted;
+  });
+
+  // Select dropdowns
+  document.querySelectorAll('select').forEach(function(el) {
+    el.style.background = c.surface;
+    el.style.color = c.ink;
+    el.style.borderColor = c.border;
+  });
+
+  // Action buttons (Fit View, Expand All, Collapse All)
+  document.querySelectorAll('.controls button').forEach(function(el) {
+    el.style.background = c.raised;
+    el.style.color = c.ink;
+    el.style.borderColor = c.border;
+  });
+
+  // Control labels
+  document.querySelectorAll('.control-group label, .stats').forEach(function(el) {
+    el.style.color = c.inkMuted;
+  });
+
+  // Search toggle button
+  var stb = document.getElementById('searchToggleBtn');
+  if (stb) { stb.style.background = c.surface; stb.style.borderColor = c.border; stb.style.color = c.ink2; stb.style.boxShadow = '2px 0 12px ' + c.shadowClr; }
+
+  // Search panel
+  var sp = document.getElementById('searchPanel');
+  if (sp) { sp.style.background = c.surface; sp.style.borderRightColor = c.border; sp.style.boxShadow = '4px 0 24px ' + c.shadowClr; }
+  var sh = document.querySelector('.search-header');
+  if (sh) sh.style.borderBottomColor = c.border;
+  var st = document.querySelector('.search-title');
+  if (st) st.style.color = c.ink;
+  var scb = document.querySelector('.search-collapse-btn');
+  if (scb) scb.style.color = c.inkMuted;
+  var siw = document.querySelector('.search-input-wrap');
+  if (siw) siw.style.borderBottomColor = c.border;
+  var si = document.getElementById('searchInput');
+  if (si) { si.style.background = c.canvas; si.style.color = c.ink; si.style.borderColor = c.border; }
+  var sclear = document.getElementById('searchClearBtn');
+  if (sclear) sclear.style.color = c.inkMuted;
+  var sempty = document.querySelector('.search-empty');
+  if (sempty) sempty.style.color = c.inkMuted;
+  var sstatus = document.getElementById('searchStatus');
+  if (sstatus) { sstatus.style.color = c.inkMuted; sstatus.style.borderTopColor = c.border; }
+  document.querySelectorAll('.search-result-title').forEach(function(el) { el.style.color = c.ink; });
+  document.querySelectorAll('.search-result-path').forEach(function(el) { el.style.color = c.inkMuted; });
+  document.querySelectorAll('.search-highlight').forEach(function(el) { el.style.color = c.accentH; el.style.background = c.keywordBg; });
+
+  // Spacing slider
+  var ss = document.getElementById('spacingSlider');
+  if (ss) { ss.style.background = c.surface; ss.style.borderColor = c.border; ss.style.boxShadow = c.shadow; }
+  document.querySelectorAll('.spacing-label').forEach(function(el) { el.style.color = c.inkMuted; });
+  document.querySelectorAll('.spacing-val').forEach(function(el) { el.style.color = c.accent; });
+
+  // Info panel
+  var ip = document.getElementById('infoPanel');
+  if (ip) { ip.style.background = c.surface; ip.style.borderLeftColor = c.border; ip.style.color = c.ink2; ip.style.boxShadow = '-4px 0 32px ' + c.shadowClr; }
+  document.querySelectorAll('.info-panel .node-title').forEach(function(el) { el.style.color = c.accent; });
+  document.querySelectorAll('.info-panel .field-label').forEach(function(el) { el.style.color = c.inkMuted; });
+  document.querySelectorAll('.info-panel .summary, .info-panel .content-para, .sum-para, .content-para').forEach(function(el) { el.style.color = c.ink2; });
+  document.querySelectorAll('.info-panel .close-btn').forEach(function(el) { el.style.color = c.inkMuted; });
+  document.querySelectorAll('.info-panel .keyword-tag').forEach(function(el) { el.style.background = c.keywordBg; el.style.color = c.keywordClr; });
+  document.querySelectorAll('.info-panel .exam-point').forEach(function(el) { el.style.borderLeftColor = c.accent; });
+  document.querySelectorAll('.info-panel .exam-meta').forEach(function(el) { el.style.color = c.inkMuted; });
+  document.querySelectorAll('.info-panel .caption-item').forEach(function(el) { el.style.background = c.canvas; el.style.color = c.ink2; });
+  document.querySelectorAll('.sum-hl').forEach(function(el) { el.style.color = c.accentH; el.style.background = c.keywordBg; });
+
+  // Inline editor
+  var ie = document.getElementById('inlineEditor');
+  if (ie) { ie.style.background = c.raised; ie.style.color = c.accent; ie.style.borderColor = c.accent; }
+
+  // Edit hint
+  var eh = document.getElementById('editHint');
+  if (eh) { eh.style.background = c.tagAccentBg; eh.style.borderColor = c.borderA; eh.style.color = c.accent; }
+
+  // Content editor
+  document.querySelectorAll('.content-edit-btn').forEach(function(el) { el.style.background = c.tagAccentBg; el.style.color = c.accentH; el.style.borderColor = c.borderA; });
+  document.querySelectorAll('.content-edit-bar').forEach(function(el) { el.style.background = c.raised; el.style.borderColor = c.border; });
+  document.querySelectorAll('.content-edit-bar button').forEach(function(el) { el.style.color = c.ink2; });
+  document.querySelectorAll('.content-editable').forEach(function(el) { el.style.background = c.canvas; el.style.color = c.ink2; el.style.borderColor = c.border; });
+  document.querySelectorAll('.content-actions .btn-save').forEach(function(el) { el.style.background = c.keywordBg; el.style.color = c.accentH; el.style.borderColor = c.borderA; });
+  document.querySelectorAll('.content-actions .btn-cancel').forEach(function(el) { el.style.background = c.raised; el.style.color = c.inkMuted; el.style.borderColor = c.border; });
+
+  // Tables
+  document.querySelectorAll('.md-table th').forEach(function(el) { el.style.background = c.raised; el.style.color = c.accentH; el.style.borderColor = c.border; });
+  document.querySelectorAll('.md-table td').forEach(function(el) { el.style.color = c.ink2; el.style.borderColor = c.border; });
+
+  // Mermaid blocks
+  document.querySelectorAll('.mermaid-block').forEach(function(el) { el.style.background = c.canvas; el.style.borderColor = c.border; });
+
+  // Block formulas
+  document.querySelectorAll('.block-formula').forEach(function(el) { el.style.background = c.raised; });
+
+  // Tooltip summary
+  document.querySelectorAll('.tooltip-summary .sum-hl').forEach(function(el) { el.style.color = c.accent; el.style.background = c.keywordBg; });
+
+  // Range input tracks (webkit)
+  var rangeStyle = document.getElementById('darkRangeStyle');
+  if (!rangeStyle) {
+    rangeStyle = document.createElement('style');
+    rangeStyle.id = 'darkRangeStyle';
+    document.head.appendChild(rangeStyle);
+  }
+  if (d) {
+    rangeStyle.textContent =
+      '.range-track { background: rgba(232,224,216,0.15); }' +
+      '.range-track:hover { background: rgba(232,224,216,0.25); }' +
+      '.range-track::-webkit-slider-thumb { border-color: #242018; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }' +
+      '.range-track::-webkit-slider-thumb:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.4); }' +
+      '.range-track::-moz-range-thumb { border-color: #242018; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }' +
+      '.range-track::-moz-range-track { background: rgba(232,224,216,0.15); }';
+  } else {
+    rangeStyle.textContent =
+      '.range-track { background: rgba(44,24,16,0.2); }' +
+      '.range-track:hover { background: rgba(44,24,16,0.3); }' +
+      '.range-track::-webkit-slider-thumb { border-color: #ffffff; box-shadow: 0 1px 4px rgba(44,24,16,0.1); }' +
+      '.range-track::-webkit-slider-thumb:hover { box-shadow: 0 2px 8px rgba(44,24,16,0.15); }' +
+      '.range-track::-moz-range-thumb { border-color: #ffffff; box-shadow: 0 1px 4px rgba(44,24,16,0.1); }' +
+      '.range-track::-moz-range-track { background: rgba(44,24,16,0.2); }';
+  }
+}
+
+// Re-apply theme when DOM changes (for dynamically generated content)
+var _themeApplyTimer = null;
+var _themeObserver = new MutationObserver(function() {
+  if (KT.getTheme() !== 'dark') return;
+  clearTimeout(_themeApplyTimer);
+  _themeApplyTimer = setTimeout(applyThemeColors, 100);
+});
+_themeObserver.observe(document.getElementById('infoPanel'), { childList: true, subtree: true });
 
 function handleThemeToggle() {
   KT.toggleTheme();
+  applyThemeColors();
   mermaid.initialize({
     startOnLoad: false,
     theme: KT.getTheme() === 'light' ? 'default' : 'dark',

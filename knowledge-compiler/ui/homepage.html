@@ -289,7 +289,7 @@ body::before {
         const baseY = marginY + row * cellH;
 
         // Stagger periods across the grid (15-25s)
-        const period = 15 + ((row * GRID_COLS + col) / (GRID_ROWS * GRID_COLS - 1)) * 10;
+        const period = 60 + ((row * GRID_COLS + col) / (GRID_ROWS * GRID_COLS - 1)) * 40;
         const phaseX = Math.random() * Math.PI * 2;
         const phaseY = Math.random() * Math.PI * 2;
 

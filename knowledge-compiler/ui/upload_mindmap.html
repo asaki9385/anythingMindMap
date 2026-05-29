@@ -69,7 +69,7 @@ body { overflow: hidden; }
   flex-shrink: 0;
 }
 
-/* ── Upload Page (single-page layout) ── */
+/* ── Upload Page ── */
 .upload-page {
   position: fixed;
   inset: 0;
@@ -87,157 +87,98 @@ body { overflow: hidden; }
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.upload-card {
-  max-width: 520px;
-  width: 90%;
-  padding: 40px 48px;
-  text-align: center;
-}
-.upload-card h2 {
-  font-family: var(--font-serif);
-  font-size: var(--text-xl);
-  margin-bottom: 6px;
-}
-.upload-card .upload-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  display: block;
-}
-.upload-card p {
-  color: var(--ink-muted);
-  font-size: var(--text-md);
-  margin-bottom: 20px;
-}
 
-/* ── Config Section ── */
-.config-section {
-  max-width: 520px;
+/* ── Upload Container ── */
+.upload-container {
+  max-width: 560px;
   width: 90%;
-  margin-bottom: var(--sp-4);
-}
-.config-header {
-  padding: var(--sp-3) var(--sp-4);
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  color: var(--ink-secondary);
-}
-.config-chevron {
-  font-size: 12px;
-  color: var(--ink-muted);
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-.config-chevron.collapsed {
-  transform: rotate(-90deg);
-}
-.config-body {
-  padding: 0 var(--sp-4) var(--sp-4);
-  overflow: hidden;
-  max-height: 400px;
-  transition: max-height var(--duration-slow) var(--ease-out),
-              padding var(--duration-slow) var(--ease-out),
-              opacity var(--duration-normal) var(--ease-out);
-}
-.config-body.collapsed {
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  opacity: 0;
-}
-.config-field {
-  margin-bottom: var(--sp-3);
-  text-align: left;
-}
-.config-field label {
-  display: block;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--ink-secondary);
-  margin-bottom: var(--sp-1);
-}
-.config-field input {
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--canvas);
-  color: var(--ink);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  font-size: var(--text-base);
-  font-family: var(--font-mono);
-  outline: none;
-  transition: border-color var(--duration-fast) var(--ease-out),
-              box-shadow var(--duration-fast) var(--ease-out);
-}
-.config-field input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--focus-ring);
-}
-.config-field input::placeholder {
-  color: var(--ink-muted);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-}
-.config-link {
-  display: inline-block;
-  margin-top: var(--sp-1);
-  font-size: var(--text-xs);
-  color: var(--accent);
-  text-decoration: none;
-  transition: color var(--duration-fast) var(--ease-out);
-}
-.config-link:hover {
-  color: var(--accent-hover);
-  text-decoration: underline;
-}
-.config-actions {
   display: flex;
-  gap: var(--sp-3);
-  margin-top: var(--sp-4);
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
-.config-degradation-note {
+
+/* ── Brand Header ── */
+.upload-brand {
+  text-align: center;
+  margin-bottom: var(--sp-8);
+}
+.upload-brand-title {
+  font-family: var(--font-serif);
+  font-size: var(--text-3xl);
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+  margin-bottom: var(--sp-2);
+}
+.upload-brand-subtitle {
+  font-size: var(--text-md);
+  color: var(--ink-muted);
+}
+
+/* ── Drop Zone ── */
+.drop-zone {
+  width: 100%;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-xl);
+  padding: var(--sp-12) var(--sp-8);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--duration-normal) var(--ease-out),
+              background var(--duration-normal) var(--ease-out),
+              box-shadow var(--duration-normal) var(--ease-out);
+  position: relative;
+}
+.drop-zone:hover {
+  border-color: var(--accent);
+  background: var(--tag-accent-bg);
+}
+.drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--tag-accent-bg);
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.drop-zone-icon {
+  display: block;
+  margin-bottom: var(--sp-3);
+  color: var(--ink-muted);
+}
+.drop-zone-icon svg {
+  width: 48px;
+  height: 48px;
+}
+.drop-zone-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.drop-zone-primary {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+.drop-zone-secondary {
+  font-size: var(--text-md);
+  color: var(--ink-muted);
+}
+.drop-zone-hint {
+  display: inline-block;
   margin-top: var(--sp-3);
-  padding: var(--sp-3);
+  padding: var(--sp-1) var(--sp-3);
   background: var(--surface-raised);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   font-size: var(--text-xs);
   color: var(--ink-muted);
-  line-height: 1.6;
-  text-align: left;
-}
-.config-degradation-note strong {
-  color: var(--ink-secondary);
 }
 
-/* ── File Input ── */
-.file-input-label {
-  display: inline-block;
-  padding: 10px 24px;
-  background: var(--accent);
-  color: #fff;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  transition: all var(--duration-fast) var(--ease-out);
-}
-.file-input-label:hover {
-  background: var(--accent-hover);
-  transform: translateY(-1px);
-}
-.file-input-label.primary {
-  background: var(--accent);
-  color: #fff;
-}
-.file-input-label.primary:hover {
-  background: var(--accent-hover);
-}
-#fileInput {
-  display: none;
-}
-
-/* ── File List (card-style) ── */
-.file-list {
-  margin-top: var(--sp-3);
+/* ── Upload File List ── */
+.upload-file-list {
+  width: 100%;
+  margin-top: var(--sp-4);
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -289,13 +230,18 @@ body { overflow: hidden; }
   background: var(--tag-danger-bg);
 }
 
-/* ── Upload Start Button ── */
-.upload-start-btn {
+/* ── Upload Actions ── */
+.upload-actions {
+  width: 100%;
   margin-top: var(--sp-4);
-  padding: 10px 32px;
+  display: none;
+}
+.upload-start-btn {
+  width: 100%;
+  padding: 12px 32px;
   font-size: var(--text-md);
   font-weight: var(--weight-bold);
-  display: none;
+  display: block;
 }
 
 /* ── Divider ── */
@@ -306,23 +252,150 @@ body { overflow: hidden; }
   margin: var(--sp-4) 0;
 }
 
-/* ── Open Existing ── */
-.open-existing-btn {
-  display: inline-block;
-  padding: 8px 20px;
-  background: transparent;
-  color: var(--ink-secondary);
+/* ── Settings Button ── */
+.settings-btn {
+  position: fixed;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  z-index: 1001;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+  transition: all var(--duration-fast) var(--ease-out);
+  padding: 0;
+}
+.settings-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--tag-accent-bg);
+}
+.settings-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+/* ── Settings Panel ── */
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 90vw;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 1002;
+  transform: translateX(100%);
+  transition: transform var(--duration-slow) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.settings-panel.open {
+  transform: translateX(0);
+}
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-secondary);
+  flex-shrink: 0;
+}
+.settings-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: var(--sp-1);
+  border-radius: var(--radius-sm);
   transition: all var(--duration-fast) var(--ease-out);
 }
-.open-existing-btn:hover {
+.settings-close:hover {
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+.settings-panel-body {
+  padding: var(--sp-4);
+  flex: 1;
+}
+.settings-panel .config-field {
+  margin-bottom: var(--sp-3);
+  text-align: left;
+}
+.settings-panel .config-field label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-secondary);
+  margin-bottom: var(--sp-1);
+}
+.settings-panel .config-field input {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+.settings-panel .config-field input:focus {
   border-color: var(--accent);
-  background: var(--tag-accent-bg);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.settings-panel .config-field input::placeholder {
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+.settings-panel .config-link {
+  display: inline-block;
+  margin-top: var(--sp-1);
+  font-size: var(--text-xs);
   color: var(--accent);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.settings-panel .config-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+.settings-panel .config-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+.settings-panel .config-degradation-note {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  line-height: 1.6;
+  text-align: left;
+}
+.settings-panel .config-degradation-note strong {
+  color: var(--ink-secondary);
 }
 
 /* ── Main Content Area ── */
@@ -1189,13 +1262,45 @@ body { overflow: hidden; }
 
 <!-- ── Upload Page (single-page: config + upload) ── -->
 <div class="upload-page" id="uploadPage">
-  <!-- Config Section (collapsible) -->
-  <div class="config-section card" id="configSection">
-    <div class="config-header flex-between cursor-pointer" onclick="toggleConfig()">
-      <span class="flex items-center gap-2"><span>⚙️</span> API Configuration</span>
-      <span class="config-chevron" id="configChevron">▼</span>
+  <!-- Settings gear button -->
+  <button class="settings-btn" id="settingsBtn" onclick="toggleSettings()" title="API Configuration">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+
+  <!-- Upload container -->
+  <div class="upload-container" id="uploadContainer">
+    <div class="upload-brand">
+      <h2 class="upload-brand-title">Knowledge Tree</h2>
+      <p class="upload-brand-subtitle">将文档转化为结构化知识树</p>
     </div>
-    <div class="config-body" id="configBody">
+
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-zone-content">
+        <span class="drop-zone-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:48px;height:48px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+        <div class="drop-zone-text">
+          <span class="drop-zone-primary">拖放文件到此处</span>
+          <span class="drop-zone-secondary">或点击选择文件</span>
+        </div>
+        <span class="drop-zone-hint">PDF, DOCX, TXT</span>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf,.docx,.txt" multiple>
+    </div>
+
+    <div class="upload-file-list" id="fileList"></div>
+
+    <div class="upload-actions" id="uploadActions">
+      <button class="primary upload-start-btn" id="startBtn" onclick="startProcessing()">开始处理</button>
+    </div>
+
+  </div>
+
+  <!-- Settings slide-out panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-panel-header">
+      <span>API Configuration</span>
+      <button class="settings-close" onclick="toggleSettings()">&times;</button>
+    </div>
+    <div class="settings-panel-body">
       <div class="config-field">
         <label for="mineruToken">MinerU API Token</label>
         <input type="password" id="mineruToken" placeholder="Paste your MinerU JWT token here">
@@ -1210,24 +1315,10 @@ body { overflow: hidden; }
         <button class="primary" onclick="saveConfig()">Save Config</button>
       </div>
       <div class="config-degradation-note">
-        <strong>Without MinerU token:</strong> PDFs are processed with PyMuPDF text extraction (less accurate for complex layouts).<br>
-        <strong>Without DeepSeek key:</strong> AI node enhancement and LLM-based text structuring are skipped.
+        <strong>Without MinerU token:</strong> PDFs processed with PyMuPDF text extraction.<br>
+        <strong>Without DeepSeek key:</strong> AI enhancement skipped.
       </div>
     </div>
-  </div>
-
-  <!-- Upload Card -->
-  <div class="upload-card card" id="uploadBox">
-    <span class="upload-icon">📄</span>
-    <h2>Upload Documents</h2>
-    <p class="text-secondary">Upload PDF, Word (.docx), or TXT files</p>
-    <label class="file-input-label primary" for="fileInput">Select Files</label>
-    <input type="file" id="fileInput" accept=".pdf,.docx,.txt" multiple>
-    <div class="file-list" id="fileList"></div>
-    <button class="primary upload-start-btn" id="startBtn" onclick="startProcessing()">Start Processing</button>
-    <div class="divider-h"></div>
-    <label class="open-existing-btn ghost" for="folderInput">Open Existing Project</label>
-    <input type="file" id="folderInput" webkitdirectory style="display:none;">
   </div>
 </div>
 
@@ -1395,20 +1486,16 @@ function saveConfig() {
   KT.showToast('Configuration saved!');
 }
 
-function toggleConfig() {
-  var body = document.getElementById('configBody');
-  var chevron = document.getElementById('configChevron');
-  body.classList.toggle('collapsed');
-  chevron.classList.toggle('collapsed');
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
 }
 
 // ── File Upload ──
 var uploadPage = document.getElementById('uploadPage');
-var uploadBox = document.getElementById('uploadBox');
+var dropZone = document.getElementById('dropZone');
 var fileInput = document.getElementById('fileInput');
 var fileListEl = document.getElementById('fileList');
 var startBtn = document.getElementById('startBtn');
-var folderInput = document.getElementById('folderInput');
 
 const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
 function isAcceptedFile(file) {
@@ -1425,9 +1512,10 @@ fileInput.addEventListener('change', (e) => {
 });
 
 function renderFileList() {
+  var actionsEl = document.getElementById('uploadActions');
   if (!selectedFiles.length) {
     fileListEl.innerHTML = '';
-    startBtn.style.display = 'none';
+    actionsEl.style.display = 'none';
     return;
   }
 
@@ -1443,7 +1531,7 @@ function renderFileList() {
       + '</div>';
   });
   fileListEl.innerHTML = html;
-  startBtn.style.display = 'inline-block';
+  actionsEl.style.display = 'block';
 }
 
 function setSelectedFiles(files) {
@@ -1460,16 +1548,16 @@ function removeFile(idx) {
 }
 
 // Drag and drop
-uploadBox.addEventListener('dragover', (e) => {
+dropZone.addEventListener('dragover', (e) => {
   e.preventDefault();
-  uploadBox.style.borderColor = 'var(--accent)';
+  dropZone.classList.add('drag-over');
 });
-uploadBox.addEventListener('dragleave', () => {
-  uploadBox.style.borderColor = '';
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('drag-over');
 });
-uploadBox.addEventListener('drop', (e) => {
+dropZone.addEventListener('drop', (e) => {
   e.preventDefault();
-  uploadBox.style.borderColor = '';
+  dropZone.classList.remove('drag-over');
   const files = Array.from(e.dataTransfer.files).filter(isAcceptedFile);
   if (files.length > 0) {
     setSelectedFiles(files);
@@ -1477,55 +1565,6 @@ uploadBox.addEventListener('drop', (e) => {
     KT.showToast('Please upload a PDF, Word, or TXT file');
   }
 });
-
-// ── Open Existing Project ──
-folderInput.addEventListener('change', (e) => {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
-  openExistingProject(files);
-});
-
-function findTreeJson(files) {
-  for (var i = 0; i < files.length; i++) {
-    var f = files[i];
-    var rel = f.webkitRelativePath || f.name;
-    if (rel.endsWith('json/knowledge_tree.json') || rel.endsWith('json\\knowledge_tree.json')) return f;
-  }
-  for (var i = 0; i < files.length; i++) {
-    var f = files[i];
-    var rel = f.webkitRelativePath || f.name;
-    if (rel.endsWith('knowledge_tree.json')) return f;
-  }
-  return null;
-}
-
-function openExistingProject(files) {
-  var treeFile = findTreeJson(files);
-  if (!treeFile) {
-    var names = files.slice(0, 8).map(function(f) { return f.webkitRelativePath || f.name; }).join('\n');
-    KT.showToast('No json/knowledge_tree.json found in selected folder. Files found:\n' + names);
-    folderInput.value = '';
-    return;
-  }
-
-  var reader = new FileReader();
-  reader.onload = function() {
-    try {
-      var data = JSON.parse(reader.result);
-      uploadPage.classList.add('hidden');
-      uploadPage.style.display = 'none';
-      enterPreview(data);
-      KT.showToast('Project loaded successfully!');
-    } catch (err) {
-      KT.showToast('Failed to parse knowledge_tree.json: ' + err.message);
-    }
-  };
-  reader.onerror = function() {
-    KT.showToast('Failed to read json/knowledge_tree.json');
-  };
-  reader.readAsText(treeFile);
-  folderInput.value = '';
-}
 
 // ── Processing ──
 async function startProcessing() {
@@ -1653,9 +1692,9 @@ function resetAndUpload() {
   document.getElementById('infoPanel').classList.remove('show');
 
   fileInput.value = '';
-  folderInput.value = '';
   fileListEl.innerHTML = '';
-  startBtn.style.display = 'none';
+  document.getElementById('uploadActions').style.display = 'none';
+  document.getElementById('settingsPanel').classList.remove('open');
   uploadPage.style.display = '';
   uploadPage.classList.remove('hidden');
 }
@@ -2380,7 +2419,6 @@ document.getElementById('zoomRange').addEventListener('input', function(e) {
 
 // ── Init ──
 (function() {
-  loadSavedConfig();
   document.getElementById('spacingSlider').style.display = 'none';
 })();
 </script>

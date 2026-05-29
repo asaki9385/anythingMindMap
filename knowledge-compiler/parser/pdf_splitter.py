@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 import fitz
 
 
@@ -31,7 +32,7 @@ def detect_chapters_by_content(pdf_path: str) -> list:
 
     for page_num in range(doc.page_count):
         page = doc[page_num]
-        text = page.get_text("text")
+        text = get_text_sorted_by_columns(page)
 
         for line in text.split('\n'):
             line = line.strip()
@@ -49,12 +50,67 @@ def detect_chapters_by_content(pdf_path: str) -> list:
     return chapters
 
 
+def detect_columns(page) -> int:
+    """Detect whether a page has single or double column layout.
+
+    Uses text-block x-centers: if they cluster into two groups with
+    a separation > 30% of page width, returns 2; otherwise 1.
+    """
+    blocks = page.get_text("blocks")
+    text_blocks = [b for b in blocks if b[4].strip()]
+    if len(text_blocks) < 4:
+        return 1
+
+    page_width = page.rect.width
+    x_centers = sorted((b[0] + b[2]) / 2 for b in text_blocks)
+
+    # Find the largest gap between adjacent sorted x-centers
+    max_gap = 0
+    split_idx = 0
+    for i in range(len(x_centers) - 1):
+        gap = x_centers[i + 1] - x_centers[i]
+        if gap > max_gap:
+            max_gap = gap
+            split_idx = i
+
+    if max_gap > page_width * 0.3 and split_idx >= 1 and split_idx < len(x_centers) - 2:
+        return 2
+    return 1
+
+
+def get_text_sorted_by_columns(page) -> str:
+    """Extract page text, reordering dual-column layouts so left column
+    comes entirely before right column."""
+    if detect_columns(page) < 2:
+        return page.get_text("text")
+
+    blocks = page.get_text("blocks")
+    text_blocks = [b for b in blocks if b[4].strip()]
+    page_mid_x = page.rect.width / 2
+
+    left = sorted(
+        [b for b in text_blocks if b[0] < page_mid_x],
+        key=lambda b: b[1],
+    )
+    right = sorted(
+        [b for b in text_blocks if b[0] >= page_mid_x],
+        key=lambda b: b[1],
+    )
+
+    left_text = "\n".join(b[4].strip() for b in left)
+    right_text = "\n".join(b[4].strip() for b in right)
+    return left_text + "\n" + right_text
+
+
 def sanitize_filename(name: str) -> str:
     """Remove invalid characters from filename."""
     invalid_chars = '<>:"/\\|?*'
     for ch in invalid_chars:
         name = name.replace(ch, '_')
-    return name.strip()
+    # Normalize ALL whitespace variants (full-width space 　, NBSP, tabs, etc.)
+    name = re.sub(r'[\s 　﻿]+', '_', name)
+    name = re.sub(r'_+', '_', name)
+    return name.strip('_').strip()
 
 
 def split_pdf_by_toc(pdf_path: str, output_dir: str, toc: list = None, max_size_mb: int = 200) -> list:
@@ -100,6 +156,22 @@ def split_pdf_by_toc(pdf_path: str, output_dir: str, toc: list = None, max_size_
         filepath = os.path.join(output_dir, filename)
         new_doc.save(filepath)
         new_doc.close()
+
+        # Resolve the actual path on disk (handles Unicode normalization)
+        filepath = str(Path(filepath).resolve())
+
+        # Verify file exists
+        if not os.path.isfile(filepath):
+            # Fallback: find the file we just saved by listing the directory
+            import glob
+            candidates = glob.glob(os.path.join(output_dir, "*.pdf"))
+            if candidates:
+                # Pick the most recently modified
+                filepath = max(candidates, key=os.path.getmtime)
+                print(f"  WARNING: expected '{filename}' not found, using '{os.path.basename(filepath)}'")
+            else:
+                print(f"  ERROR: file not saved: {filepath}")
+                continue
 
         # check size
         size_mb = os.path.getsize(filepath) / (1024 * 1024)
