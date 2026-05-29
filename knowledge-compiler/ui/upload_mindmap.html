@@ -1298,7 +1298,29 @@ function handleThemeToggle() {
     securityLevel: 'loose',
     fontFamily: 'Noto Sans SC, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
   });
-  if (chart && treeData) renderChart(currentLayout, currentExpandLevel);
+  if (chart && treeData) {
+    var themeAccent = KT.getTheme() === 'light' ? '#c07a2e' : '#e8a84c';
+    var lineColor = KT.getTheme() === 'light' ? 'rgba(192, 122, 46, 0.15)' : 'rgba(232, 168, 76, 0.15)';
+    var successColor = KT.getTheme() === 'light' ? 'rgba(58, 138, 80, 0.3)' : 'rgba(78, 184, 104, 0.3)';
+    chart.setOption({
+      series: [{
+        label: {
+          color: KT.getChartLabelColor(),
+          rich: { enhanced: { backgroundColor: successColor } }
+        },
+        leaves: { label: { color: KT.getChartLeafLabelColor() } },
+        lineStyle: { color: lineColor },
+        emphasis: {
+          itemStyle: {
+            color: themeAccent,
+            borderColor: themeAccent,
+            shadowColor: themeAccent.replace(')', ', 0.3)').replace('rgb', 'rgba')
+          },
+          label: { color: themeAccent }
+        }
+      }]
+    });
+  }
 }
 
 // ── Mermaid Init ──
@@ -1718,13 +1740,17 @@ function initSpacingSlider() {
     });
     if (collapsedNodes.size > 0) {
       var nodeMap = getNodeIndexMap(treeData);
-      requestAnimationFrame(function() {
+      function restoreCollapsed() {
         collapsedNodes.forEach(function(name) {
           var idx = nodeMap[name];
           if (idx !== undefined) {
             chart.dispatchAction({ type: 'treeExpandAndCollapse', seriesIndex: 0, dataIndex: idx });
           }
         });
+      }
+      chart.on('rendered', function handler() {
+        chart.off('rendered', handler);
+        restoreCollapsed();
       });
     }
   }
