@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Tree</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+/* ════════════════════════════════════════════════════════════════
+   Homepage — Warm Academic Landing
+   ════════════════════════════════════════════════════════════════ */
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+  background: #faf8f5;
+}
+
+/* ── Grain texture overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.5;
+}
+
+/* ── Canvas container ── */
+#web-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── Content wrapper ── */
+.homepage-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 0 24px;
+}
+
+/* ── Staggered reveal animation ── */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal-item {
+  opacity: 0;
+  animation: reveal 0.7s var(--ease-out) forwards;
+}
+
+.reveal-title    { animation-delay: 0.15s; }
+.reveal-subtitle { animation-delay: 0.35s; }
+.reveal-buttons  { animation-delay: 0.55s; }
+.reveal-stats    { animation-delay: 0.75s; }
+
+/* ── Title ── */
+.homepage-title {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: var(--weight-bold);
+  color: #2c2418;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* ── Subtitle ── */
+.homepage-subtitle {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: #9a8b7e;
+  text-align: center;
+  letter-spacing: 0.04em;
+  margin-top: -4px;
+}
+
+/* ── Button group ── */
+.homepage-buttons {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.homepage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 28px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.25s var(--ease-out),
+              box-shadow 0.25s var(--ease-out),
+              background 0.2s var(--ease-out);
+}
+
+.homepage-btn:hover {
+  transform: scale(1.04);
+}
+
+.homepage-btn:active {
+  transform: scale(0.98);
+}
+
+/* Primary button: Upload */
+.btn-upload {
+  background: #e8a84c;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(232, 168, 76, 0.25);
+}
+.btn-upload:hover {
+  background: #f0bc6c;
+  box-shadow: 0 4px 20px rgba(232, 168, 76, 0.35);
+}
+
+/* Secondary button: Browse */
+.btn-browse {
+  background: transparent;
+  color: #2c2418;
+  border: 1.5px solid #d8d0c8;
+  box-shadow: none;
+}
+.btn-browse:hover {
+  background: #f5f0eb;
+  border-color: #b8b0a8;
+  box-shadow: 0 2px 12px rgba(44, 36, 24, 0.06);
+}
+
+/* ── Button icon ── */
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
+}
+
+/* ── Stats row ── */
+.homepage-stats {
+  display: flex;
+  gap: 32px;
+  margin-top: 12px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-number {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: var(--weight-bold);
+  color: #2c2418;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: #9a8b7e;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .homepage-title { font-size: 28px; }
+  .homepage-buttons { flex-direction: column; gap: 10px; }
+  .homepage-btn { justify-content: center; }
+  .homepage-stats { gap: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-item { animation: none; opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="web-canvas"></canvas>
+
+<div class="homepage-content">
+  <h1 class="homepage-title reveal-item reveal-title">Knowledge Tree</h1>
+  <p class="homepage-subtitle reveal-item reveal-subtitle">将文档转化为结构化知识树</p>
+
+  <div class="homepage-buttons reveal-item reveal-buttons">
+    <a href="/ui/upload_mindmap.html" class="homepage-btn btn-upload">
+      <svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 10V3M8 3L5 6M8 3l3 3"/>
+        <path d="M2 10v2a1 1 0 001 1h10a1 1 0 001-1v-2"/>
+      </svg>
+      开始上传
+    </a>
+    <a href="/ui/browse.html" class="homepage-btn btn-browse">
+      <svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 4h12M2 8h8M2 12h10"/>
+      </svg>
+      打开已有
+    </a>
+  </div>
+
+  <div class="homepage-stats reveal-item reveal-stats">
+    <div class="stat-item">
+      <span class="stat-number" id="stat-trees">0</span>
+      <span class="stat-label">知识树</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number" id="stat-nodes">0</span>
+      <span class="stat-label">节点</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  Spider-Web Particle Animation
+// ════════════════════════════════════════════════════════════════
+
+(function () {
+  'use strict';
+
+  const canvas = document.getElementById('web-canvas');
+  const ctx = canvas.getContext('2d');
+  const LINE_COLOR = '#787060';
+  const LINE_ALPHA = 0.18;
+  const NEIGHBOR_COUNT = 4;
+  const PARTICLE_COUNT = 20;
+  const GRID_COLS = 5;
+  const GRID_ROWS = 4;
+
+  // Particle color palette — warm, muted tones
+  const COLORS = [
+    '#e8a84c', // amber
+    '#3aa88f', // teal
+    '#7a9dd0', // blue
+    '#a888cc', // purple
+    '#d09070', // terracotta
+  ];
+
+  let particles = [];
+  let W, H;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    initParticles();
+  }
+
+  function initParticles() {
+    particles = [];
+    const marginX = W * 0.15;
+    const marginY = H * 0.15;
+    const cellW = (W - marginX * 2) / (GRID_COLS - 1);
+    const cellH = (H - marginY * 2) / (GRID_ROWS - 1);
+
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        const baseX = marginX + col * cellW;
+        const baseY = marginY + row * cellH;
+
+        // Stagger periods across the grid (15-25s)
+        const period = 15 + ((row * GRID_COLS + col) / (GRID_ROWS * GRID_COLS - 1)) * 10;
+        const phaseX = Math.random() * Math.PI * 2;
+        const phaseY = Math.random() * Math.PI * 2;
+
+        // Amplitude of sine movement
+        const ampX = cellW * 0.35;
+        const ampY = cellH * 0.35;
+
+        const radius = 5 + Math.random() * 4; // 5-9px
+        const color = COLORS[(row * GRID_COLS + col) % COLORS.length];
+
+        particles.push({
+          baseX, baseY, period, phaseX, phaseY, ampX, ampY,
+          radius, color, x: baseX, y: baseY
+        });
+      }
+    }
+  }
+
+  // Euclidean distance
+  function dist(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Find k nearest neighbors for a particle
+  function findNeighbors(idx, k) {
+    const d = particles.map((p, i) => ({ i, d: i === idx ? Infinity : dist(particles[idx], p) }));
+    d.sort((a, b) => a.d - b.d);
+    return d.slice(0, k).map(n => n.i);
+  }
+
+  let frame = 0;
+  // Pre-compute neighbors (they don't change structurally)
+  let neighborMap = [];
+
+  function buildNeighborMap() {
+    neighborMap = particles.map((_, i) => findNeighbors(i, NEIGHBOR_COUNT));
+  }
+
+  function draw() {
+    frame++;
+    ctx.clearRect(0, 0, W, H);
+
+    const t = frame / 60; // seconds elapsed (at ~60fps)
+
+    // Update particle positions via cyclic sine movement
+    for (const p of particles) {
+      p.x = p.baseX + Math.sin((2 * Math.PI / p.period) * t + p.phaseX) * p.ampX;
+      p.y = p.baseY + Math.sin((2 * Math.PI / p.period) * t + p.phaseY) * p.ampY;
+    }
+
+    // Draw connections (spider-web lines)
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = LINE_COLOR;
+    ctx.globalAlpha = LINE_ALPHA;
+    for (let i = 0; i < particles.length; i++) {
+      const neighbors = neighborMap[i];
+      if (!neighbors) continue;
+      for (const ni of neighbors) {
+        // Draw each edge only once
+        if (ni > i) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[ni].x, particles[ni].y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Draw particles
+    for (const p of particles) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = 0.55;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => {
+    resize();
+    buildNeighborMap();
+  });
+
+  resize();
+  buildNeighborMap();
+  draw();
+})();
+
+
+// ════════════════════════════════════════════════════════════════
+//  Stats Fetch + Count-Up Animation
+// ════════════════════════════════════════════════════════════════
+
+(function () {
+  'use strict';
+
+  const DURATION = 1200; // ms
+
+  function animateCount(el, target) {
+    if (target <= 0) {
+      el.textContent = '0';
+      return;
+    }
+    const start = performance.now();
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / DURATION, 1);
+      // Ease-out cubic
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(ease * target);
+      el.textContent = current.toLocaleString();
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Delay fetch to let the reveal animation settle
+  setTimeout(() => {
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(data => {
+        const treeEl = document.getElementById('stat-trees');
+        const nodeEl = document.getElementById('stat-nodes');
+        if (treeEl && data.tree_count != null) animateCount(treeEl, data.tree_count);
+        if (nodeEl && data.node_count != null) animateCount(nodeEl, data.node_count);
+      })
+      .catch(() => {
+        // Silently handle — stats are decorative
+      });
+  }, 900);
+})();
+</script>
+</body>
+</html>
