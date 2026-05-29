@@ -78,7 +78,7 @@ if os.path.isdir(UI_DIR):
 @app.get("/")
 async def root():
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/ui/upload_mindmap.html")
+    return RedirectResponse(url="/ui/homepage.html")
 
 
 # ────────────────────────────────────────────
@@ -1135,6 +1135,140 @@ async def api_update_node(data: dict):
 @app.get("/api/health")
 async def api_health():
     return {"status": "ok", "tasks": len(tasks)}
+
+
+@app.get("/api/stats")
+async def api_stats():
+    """Return knowledge tree count and total node count."""
+    tree_count = 0
+    node_count = 0
+
+    # Count from tree_parts_enhanced_fixed
+    enhanced_dir = os.path.join(BASE_DIR, "data", "tree_parts_enhanced_fixed")
+    if os.path.isdir(enhanced_dir):
+        for f in os.listdir(enhanced_dir):
+            if f.endswith(".json"):
+                tree_count += 1
+                try:
+                    with open(os.path.join(enhanced_dir, f), encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    node_count += _count_nodes(data)
+                except Exception:
+                    pass
+
+    # Count from completed tasks
+    if os.path.isdir(TEMP_DIR):
+        for task_dir in os.listdir(TEMP_DIR):
+            json_path = os.path.join(TEMP_DIR, task_dir, "json", "knowledge_tree.json")
+            if os.path.isfile(json_path):
+                tree_count += 1
+                try:
+                    with open(json_path, encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    node_count += _count_nodes(data)
+                except Exception:
+                    pass
+
+    return {"tree_count": tree_count, "node_count": node_count}
+
+
+def _count_nodes(node: dict) -> int:
+    """Count total nodes in a tree recursively."""
+    count = 1
+    for child in node.get("children", []):
+        count += _count_nodes(child)
+    return count
+
+
+@app.get("/api/files")
+async def api_files():
+    """List knowledge tree JSON files available locally."""
+    files = []
+
+    # From tree_parts_enhanced_fixed
+    enhanced_dir = os.path.join(BASE_DIR, "data", "tree_parts_enhanced_fixed")
+    if os.path.isdir(enhanced_dir):
+        for f in sorted(os.listdir(enhanced_dir)):
+            if f.endswith(".json"):
+                fpath = os.path.join(enhanced_dir, f)
+                stat = os.stat(fpath)
+                files.append({
+                    "filename": f,
+                    "source": "enhanced",
+                    "size": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+
+    # From completed tasks
+    if os.path.isdir(TEMP_DIR):
+        for task_dir in sorted(os.listdir(TEMP_DIR)):
+            json_path = os.path.join(TEMP_DIR, task_dir, "json", "knowledge_tree.json")
+            if os.path.isfile(json_path):
+                stat = os.stat(json_path)
+                files.append({
+                    "filename": f"task_{task_dir}",
+                    "task_id": task_dir,
+                    "source": "task",
+                    "size": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+
+    return {"files": files}
+
+
+@app.get("/api/tasks")
+async def api_tasks():
+    """List historical tasks with status and metadata."""
+    result = []
+
+    if not os.path.isdir(TEMP_DIR):
+        return {"tasks": result}
+
+    for task_dir in sorted(os.listdir(TEMP_DIR), reverse=True):
+        work_dir = os.path.join(TEMP_DIR, task_dir)
+        json_path = os.path.join(work_dir, "json", "knowledge_tree.json")
+        status = "done" if os.path.isfile(json_path) else "incomplete"
+
+        # Find original filename from uploads
+        uploads_dir = os.path.join(work_dir, "uploads")
+        original_name = task_dir
+        if os.path.isdir(uploads_dir):
+            upload_files = os.listdir(uploads_dir)
+            if upload_files:
+                original_name = upload_files[0]
+
+        stat = os.stat(work_dir)
+        result.append({
+            "task_id": task_dir,
+            "filename": original_name,
+            "status": status,
+            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        })
+
+    return {"tasks": result}
+
+
+@app.get("/api/file/{filename}")
+async def api_file(filename: str):
+    """Load a specific knowledge tree JSON file."""
+    safe_filename = os.path.basename(filename)
+
+    # Search in tree_parts_enhanced_fixed
+    enhanced_dir = os.path.join(BASE_DIR, "data", "tree_parts_enhanced_fixed")
+    filepath = os.path.join(enhanced_dir, safe_filename)
+    if os.path.isfile(filepath):
+        with open(filepath, encoding="utf-8") as f:
+            return JSONResponse(json.load(f))
+
+    # Search in task directories
+    if os.path.isdir(TEMP_DIR):
+        for task_dir in os.listdir(TEMP_DIR):
+            json_path = os.path.join(TEMP_DIR, task_dir, "json", "knowledge_tree.json")
+            if os.path.isfile(json_path) and f"task_{task_dir}" == safe_filename:
+                with open(json_path, encoding="utf-8") as f:
+                    return JSONResponse(json.load(f))
+
+    return JSONResponse({"error": f"File not found: {safe_filename}"}, status_code=404)
 
 
 # ────────────────────────────────────────────
