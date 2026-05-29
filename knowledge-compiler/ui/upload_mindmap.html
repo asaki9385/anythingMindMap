@@ -757,25 +757,24 @@ body { overflow: hidden; }
   left: 0;
   transform: translateY(-50%);
   z-index: 501;
-  width: 28px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: none;
-  border-radius: 0 6px 6px 0;
-  cursor: pointer;
-  color: var(--ink-secondary);
-  transition: opacity 0.3s ease, background 0.2s;
   box-shadow: 2px 0 12px var(--shadow-color);
-  writing-mode: vertical-lr;
-  letter-spacing: 2px;
-  font-size: 12px;
-  padding: 0;
+  color: var(--ink-secondary);
+  cursor: pointer;
   display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: opacity 0.3s ease, background 0.2s, color 0.2s;
 }
 .search-toggle-btn:hover {
-  color: var(--accent);
   background: var(--surface-raised);
+  color: var(--accent-hover);
 }
 .search-toggle-btn.shifted {
   opacity: 0;
