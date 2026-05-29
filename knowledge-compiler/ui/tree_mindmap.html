@@ -867,9 +867,12 @@ function handleThemeToggle() {
     fontFamily: 'Noto Sans SC, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
   });
   if (chart && treeData) {
+    saveTreeState();
     var themeAccent = KT.getTheme() === 'light' ? '#c07a2e' : '#e8a84c';
     var lineColor = KT.getTheme() === 'light' ? 'rgba(192, 122, 46, 0.15)' : 'rgba(232, 168, 76, 0.15)';
     var successColor = KT.getTheme() === 'light' ? 'rgba(58, 138, 80, 0.3)' : 'rgba(78, 184, 104, 0.3)';
+    restoreTreeState();
+    isRestoring = true;
     chart.setOption({
       series: [{
         label: {
@@ -888,6 +891,7 @@ function handleThemeToggle() {
         }
       }]
     });
+    isRestoring = false;
   }
 }
 
@@ -1019,21 +1023,8 @@ function countNodes(node) {
 }
 
 // ── Spacing ──
-var collapsedNodes = new Set();
-
-function getNodeIndexMap(tree) {
-  var map = {};
-  var idx = 0;
-  function walk(node) {
-    var name = node.title || node.name || '';
-    map[name] = idx;
-    idx++;
-    if (node.children) node.children.forEach(walk);
-  }
-  if (Array.isArray(tree)) tree.forEach(walk);
-  else walk(tree);
-  return map;
-}
+var expandedNodes = new Set();
+var isRestoring = false;
 
 function initSpacingSlider() {
   var widthInput = document.getElementById('spacingWidth');
@@ -1042,21 +1033,26 @@ function initSpacingSlider() {
   var heightVal = document.getElementById('spacingHeightVal');
 
   chart.on('expand', function(params) {
+    if (isRestoring) return;
     if (params.data && (params.data.name || params.data.title))
-      collapsedNodes.delete(params.data.name || params.data.title);
+      expandedNodes.add(params.data.name || params.data.title);
   });
   chart.on('collapse', function(params) {
+    if (isRestoring) return;
     if (params.data && (params.data.name || params.data.title))
-      collapsedNodes.add(params.data.name || params.data.title);
+      expandedNodes.delete(params.data.name || params.data.title);
   });
 
   function applySpacing() {
     if (!chart) return;
+    saveTreeState();
     var isHorizontal = currentLayout === 'LR' || currentLayout === 'RL';
     var sW = (widthSpacing - 100) / 100;
     var wFactor = 1 - sW;
     var sH = (heightSpacing - 100) / 100;
     var hFactor = 1 - sH;
+    restoreTreeState();
+    isRestoring = true;
     chart.setOption({
       series: [{
         top: Math.max(0.3, 4 * hFactor) + '%',
@@ -1065,21 +1061,7 @@ function initSpacingSlider() {
         bottom: Math.max(0.3, 4 * hFactor) + '%'
       }]
     });
-    if (collapsedNodes.size > 0) {
-      var nodeMap = getNodeIndexMap(treeData);
-      function restoreCollapsed() {
-        collapsedNodes.forEach(function(name) {
-          var idx = nodeMap[name];
-          if (idx !== undefined) {
-            chart.dispatchAction({ type: 'treeExpandAndCollapse', seriesIndex: 0, dataIndex: idx });
-          }
-        });
-      }
-      chart.on('rendered', function handler() {
-        chart.off('rendered', handler);
-        restoreCollapsed();
-      });
-    }
+    isRestoring = false;
   }
 
   widthInput.addEventListener('input', function() {
@@ -1093,6 +1075,28 @@ function initSpacingSlider() {
     heightVal.textContent = heightSpacing;
     applySpacing();
   });
+}
+
+function saveTreeState() {
+  if (!treeData) return;
+  function walk(node) {
+    var name = node.name || node.title || '';
+    if (name && node.collapsed === false) expandedNodes.add(name);
+    if (node.children) node.children.forEach(walk);
+  }
+  if (Array.isArray(treeData)) treeData.forEach(walk);
+  else walk(treeData);
+}
+
+function restoreTreeState() {
+  if (!treeData) return;
+  function walk(node) {
+    var name = node.name || node.title || '';
+    if (name) node.collapsed = !expandedNodes.has(name);
+    if (node.children) node.children.forEach(walk);
+  }
+  if (Array.isArray(treeData)) treeData.forEach(walk);
+  else walk(treeData);
 }
 
 // ── Chart Init ──
