@@ -955,6 +955,31 @@ function transformNode(node, depth, pathInFile) {
 
 // ── Data Loading ──
 async function loadAllParts() {
+  const params = new URLSearchParams(window.location.search);
+  const fileParam = params.get('file');
+  const taskParam = params.get('task');
+
+  // Load from specific task
+  if (taskParam) {
+    const response = await fetch(`/api/result/${taskParam}`);
+    if (!response.ok) throw new Error(`Failed to load task ${taskParam}: ${response.status}`);
+    const data = await response.json();
+    const node = transformNode(data, 1);
+    node._sourceFile = `task_${taskParam}`;
+    return node;
+  }
+
+  // Load from specific file
+  if (fileParam) {
+    const response = await fetch(`/api/file/${encodeURIComponent(fileParam)}`);
+    if (!response.ok) throw new Error(`Failed to load file ${fileParam}: ${response.status}`);
+    const data = await response.json();
+    const node = transformNode(data, 1);
+    node._sourceFile = fileParam;
+    return node;
+  }
+
+  // Default: load from tree_parts_enhanced_fixed (existing behavior)
   const partFiles = [];
   for (let i = 1; i <= 4; i++) {
     const filename = `Part_${i}_tree_enhanced.json`;
