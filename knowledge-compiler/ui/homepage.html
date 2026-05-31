@@ -704,6 +704,29 @@ body::before {
 gsap.registerPlugin(ScrollTrigger);
 
 // ════════════════════════════════════════════════════════════════
+//  Full-Screen Section Snap
+// ════════════════════════════════════════════════════════════════
+
+(function () {
+  'use strict';
+
+  const sections = gsap.utils.toArray('.scroll-section');
+
+  // Snap to sections on scroll
+  ScrollTrigger.create({
+    trigger: '.scroll-container',
+    start: 'top top',
+    end: 'bottom bottom',
+    snap: {
+      snapTo: 1 / (sections.length - 1),
+      duration: 0.6,
+      delay: 0.1,
+      ease: 'power2.inOut'
+    }
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════
 //  Spider-Web Particle Animation
 // ════════════════════════════════════════════════════════════════
 
