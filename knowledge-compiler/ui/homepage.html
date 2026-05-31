@@ -59,6 +59,7 @@ body::before {
   height: 100%;
   z-index: 0;
   pointer-events: none;
+  transition: opacity 0.5s var(--ease-out);
 }
 
 /* ── Content wrapper ── */
@@ -218,6 +219,17 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal-item { animation: none; opacity: 1; }
+  .feature-card,
+  .process-step,
+  .process-connector,
+  .cta-title,
+  .cta-desc,
+  .cta-button {
+    opacity: 1;
+    transform: none;
+  }
+  .scroll-hint { animation: none; opacity: 1; }
+  .scroll-hint-arrow { animation: none; }
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -703,6 +715,11 @@ body::before {
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger);
 
+// Check for reduced motion preference
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+if (!prefersReducedMotion) {
+
 // ════════════════════════════════════════════════════════════════
 //  Full-Screen Section Snap
 // ════════════════════════════════════════════════════════════════
@@ -822,6 +839,22 @@ gsap.utils.toArray('.section-subtitle').forEach(subtitle => {
       toggleActions: 'play none none reverse'
     }
   });
+});
+
+} // end if (!prefersReducedMotion)
+
+// ════════════════════════════════════════════════════════════════
+//  Canvas Visibility Control
+// ════════════════════════════════════════════════════════════════
+
+const canvasEl = document.getElementById('web-canvas');
+
+ScrollTrigger.create({
+  trigger: '.hero-section',
+  start: 'top top',
+  end: 'bottom top',
+  onLeave: () => { canvasEl.style.opacity = '0'; },
+  onEnterBack: () => { canvasEl.style.opacity = '1'; }
 });
 
 // ════════════════════════════════════════════════════════════════
