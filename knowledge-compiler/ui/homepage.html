@@ -239,17 +239,21 @@ body::before {
 
 .section-title {
   font-family: var(--font-serif);
-  font-size: 32px;
+  font-size: 40px;
   font-weight: var(--weight-bold);
   color: #2c2418;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  letter-spacing: 0.01em;
+  will-change: transform, opacity;
 }
 
 .section-subtitle {
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 16px;
   color: #9a8b7e;
-  margin-bottom: 48px;
+  margin-bottom: 56px;
+  letter-spacing: 0.02em;
+  will-change: transform, opacity;
 }
 
 /* ── Hero Section ── */
@@ -301,7 +305,18 @@ body::before {
 
 /* ── Features Section ── */
 .features-section {
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #faf8f5 100%);
+  position: relative;
+}
+
+.features-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(192, 122, 46, 0.2), transparent);
 }
 
 .features-grid {
@@ -311,36 +326,69 @@ body::before {
 }
 
 .feature-card {
-  background: #faf8f5;
-  border: 1px solid rgba(44, 36, 24, 0.08);
-  border-radius: 16px;
-  padding: 36px 28px;
+  background: #ffffff;
+  border: 1px solid rgba(44, 36, 24, 0.06);
+  border-radius: 20px;
+  padding: 40px 32px;
   text-align: center;
-  transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.4s var(--ease-out),
+              border-color 0.3s var(--ease-out);
   opacity: 0;
   transform: translateY(40px);
+  will-change: transform, opacity;
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #c07a2e, #e8a84c);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s var(--ease-out);
 }
 
 .feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(44, 36, 24, 0.1);
+  transform: translateY(-8px);
+  box-shadow: 0 20px 60px rgba(44, 36, 24, 0.12);
+  border-color: rgba(192, 122, 46, 0.15);
+}
+
+.feature-card:hover::before {
+  transform: scaleX(1);
 }
 
 .feature-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 20px;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 24px;
   color: #c07a2e;
+  background: linear-gradient(135deg, rgba(192, 122, 46, 0.1), rgba(232, 168, 76, 0.05));
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s var(--ease-out);
+}
+
+.feature-card:hover .feature-icon {
+  transform: scale(1.1) rotate(-5deg);
 }
 
 .feature-icon svg {
-  width: 100%;
-  height: 100%;
+  width: 36px;
+  height: 36px;
 }
 
 .feature-title {
   font-family: var(--font-serif);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: var(--weight-bold);
   color: #2c2418;
   margin-bottom: 12px;
@@ -350,39 +398,60 @@ body::before {
   font-family: var(--font-sans);
   font-size: 14px;
   color: #6b5b4e;
-  line-height: 1.7;
+  line-height: 1.8;
 }
 
 /* ── Process Section ── */
 .process-section {
   background: #faf8f5;
+  position: relative;
+}
+
+.process-section::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(192, 122, 46, 0.03) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .process-steps {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  gap: 32px;
+  position: relative;
 }
 
 .process-step {
   display: flex;
   align-items: flex-start;
-  gap: 20px;
+  gap: 24px;
   text-align: left;
   flex: 1;
-  max-width: 280px;
+  max-width: 300px;
   opacity: 0;
   transform: translateY(30px);
+  will-change: transform, opacity;
 }
 
 .step-number {
   font-family: var(--font-mono);
-  font-size: 36px;
+  font-size: 48px;
   font-weight: var(--weight-bold);
   color: #c07a2e;
   line-height: 1;
   flex-shrink: 0;
+  opacity: 0.8;
+  transition: opacity 0.3s var(--ease-out);
+}
+
+.process-step:hover .step-number {
+  opacity: 1;
 }
 
 .step-content {
@@ -391,72 +460,125 @@ body::before {
 
 .step-title {
   font-family: var(--font-serif);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: var(--weight-bold);
   color: #2c2418;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .step-desc {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 14px;
   color: #6b5b4e;
-  line-height: 1.7;
+  line-height: 1.8;
 }
 
 .process-connector {
-  width: 48px;
+  width: 64px;
   height: 2px;
   background: linear-gradient(90deg, #c07a2e, #e8a84c);
   flex-shrink: 0;
   opacity: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.process-connector::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  100% { left: 100%; }
 }
 
 /* ── CTA Section ── */
 .cta-section {
-  background: #2c2418;
+  background: linear-gradient(135deg, #1a1814 0%, #2c2418 50%, #1a1814 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 30% 50%, rgba(232, 168, 76, 0.08) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .cta-title {
   font-family: var(--font-serif);
-  font-size: 36px;
+  font-size: 44px;
   font-weight: var(--weight-bold);
   color: #faf8f5;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   opacity: 0;
   transform: translateY(30px);
+  letter-spacing: 0.01em;
+  will-change: transform, opacity;
 }
 
 .cta-desc {
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 18px;
   color: #9a8b7e;
-  margin-bottom: 40px;
+  margin-bottom: 48px;
   opacity: 0;
   transform: translateY(30px);
+  letter-spacing: 0.02em;
+  will-change: transform, opacity;
 }
 
 .cta-button {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 40px;
-  background: #e8a84c;
+  padding: 18px 48px;
+  background: linear-gradient(135deg, #e8a84c 0%, #c07a2e 100%);
   color: #fff;
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: var(--weight-semibold);
   text-decoration: none;
   border-radius: 9999px;
-  transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out), background 0.2s;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.4s var(--ease-out);
   opacity: 0;
   transform: translateY(30px);
+  will-change: transform, opacity;
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.02em;
+}
+
+.cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s var(--ease-out);
 }
 
 .cta-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 30px rgba(232, 168, 76, 0.4);
-  background: #f0bc6c;
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 16px 48px rgba(232, 168, 76, 0.4);
+}
+
+.cta-button:hover::before {
+  left: 100%;
 }
 
 .cta-arrow {
@@ -466,7 +588,7 @@ body::before {
 }
 
 .cta-button:hover .cta-arrow {
-  transform: translateX(4px);
+  transform: translateX(6px);
 }
 
 /* ── Responsive for scroll sections ── */
@@ -715,7 +837,7 @@ const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)
 if (!prefersReducedMotion) {
 
 // ════════════════════════════════════════════════════════════════
-//  Full-Screen Section Snap
+//  Full-Screen Section Snap with Enhanced Easing
 // ════════════════════════════════════════════════════════════════
 
 (function () {
@@ -723,7 +845,7 @@ if (!prefersReducedMotion) {
 
   const sections = gsap.utils.toArray('.scroll-section');
 
-  // Snap to sections on scroll
+  // Smoother snap with custom easing
   ScrollTrigger.create({
     trigger: '.scroll-container',
     start: 'top top',
@@ -731,91 +853,54 @@ if (!prefersReducedMotion) {
     scroller: window,
     snap: {
       snapTo: 1 / (sections.length - 1),
-      duration: { min: 0.3, max: 0.6 },
-      delay: 0.1,
-      ease: 'power2.inOut'
+      duration: { min: 0.4, max: 0.8 },
+      delay: 0.15,
+      ease: 'power3.inOut'
     }
   });
 })();
 
 // ════════════════════════════════════════════════════════════════
-//  Section Element Animations
+//  Hero Section Parallax
 // ════════════════════════════════════════════════════════════════
 
-// Feature cards fade in with stagger
-gsap.utils.toArray('.feature-card').forEach((card, i) => {
-  gsap.to(card, {
-    opacity: 1,
-    y: 0,
-    duration: 0.8,
-    delay: i * 0.15,
-    ease: 'power2.out',
-    scrollTrigger: {
-      trigger: card,
-      start: 'top 80%',
-      toggleActions: 'play none none reverse'
-    }
-  });
+gsap.to('.homepage-content', {
+  y: -80,
+  ease: 'none',
+  scrollTrigger: {
+    trigger: '.hero-section',
+    start: 'top top',
+    end: 'bottom top',
+    scrub: 1
+  }
 });
 
-// Process steps reveal sequentially
-gsap.utils.toArray('.process-step').forEach((step, i) => {
-  gsap.to(step, {
-    opacity: 1,
-    y: 0,
-    duration: 0.7,
-    delay: i * 0.2,
-    ease: 'power2.out',
-    scrollTrigger: {
-      trigger: '.process-section',
-      start: 'top 60%',
-      toggleActions: 'play none none reverse'
-    }
-  });
+gsap.to('.scroll-hint', {
+  y: 40,
+  opacity: 0,
+  ease: 'none',
+  scrollTrigger: {
+    trigger: '.hero-section',
+    start: 'top top',
+    end: '30% top',
+    scrub: 1
+  }
 });
 
-// Process connectors
-gsap.utils.toArray('.process-connector').forEach((conn, i) => {
-  gsap.to(conn, {
-    opacity: 1,
-    duration: 0.5,
-    delay: 0.3 + i * 0.2,
-    ease: 'power2.out',
-    scrollTrigger: {
-      trigger: '.process-section',
-      start: 'top 60%',
-      toggleActions: 'play none none reverse'
-    }
-  });
-});
+// ════════════════════════════════════════════════════════════════
+//  Section Element Animations with Stagger
+// ════════════════════════════════════════════════════════════════
 
-// CTA section elements
-const ctaElements = ['.cta-title', '.cta-desc', '.cta-button'];
-ctaElements.forEach((selector, i) => {
-  gsap.to(selector, {
-    opacity: 1,
-    y: 0,
-    duration: 0.8,
-    delay: i * 0.2,
-    ease: 'power2.out',
-    scrollTrigger: {
-      trigger: '.cta-section',
-      start: 'top 60%',
-      toggleActions: 'play none none reverse'
-    }
-  });
-});
-
-// Section titles
+// Section titles and subtitles
 gsap.utils.toArray('.section-title').forEach(title => {
   gsap.from(title, {
     opacity: 0,
-    y: 20,
-    duration: 0.6,
-    ease: 'power2.out',
+    y: 40,
+    duration: 0.8,
+    ease: 'power3.out',
     scrollTrigger: {
       trigger: title,
-      start: 'top 80%',
+      start: 'top 85%',
       toggleActions: 'play none none reverse'
     }
   });
@@ -824,15 +909,133 @@ gsap.utils.toArray('.section-title').forEach(title => {
 gsap.utils.toArray('.section-subtitle').forEach(subtitle => {
   gsap.from(subtitle, {
     opacity: 0,
-    y: 20,
-    duration: 0.6,
+    y: 30,
+    duration: 0.7,
     delay: 0.1,
-    ease: 'power2.out',
+    ease: 'power3.out',
     scrollTrigger: {
       trigger: subtitle,
-      start: 'top 80%',
+      start: 'top 85%',
       toggleActions: 'play none none reverse'
     }
+  });
+});
+
+// Feature cards with stagger
+const featureCards = gsap.utils.toArray('.feature-card');
+gsap.from(featureCards, {
+  opacity: 0,
+  y: 60,
+  scale: 0.95,
+  duration: 0.8,
+  stagger: 0.15,
+  ease: 'back.out(1.4)',
+  scrollTrigger: {
+    trigger: '.features-grid',
+    start: 'top 75%',
+    toggleActions: 'play none none reverse'
+  }
+});
+
+// Process steps with stagger
+const processSteps = gsap.utils.toArray('.process-step');
+gsap.from(processSteps, {
+  opacity: 0,
+  x: -40,
+  duration: 0.7,
+  stagger: 0.2,
+  ease: 'power3.out',
+  scrollTrigger: {
+    trigger: '.process-steps',
+    start: 'top 70%',
+    toggleActions: 'play none none reverse'
+  }
+});
+
+// Process connectors with stagger
+const processConnectors = gsap.utils.toArray('.process-connector');
+gsap.from(processConnectors, {
+  scaleX: 0,
+  opacity: 0,
+  duration: 0.5,
+  stagger: 0.15,
+  ease: 'power2.out',
+  scrollTrigger: {
+    trigger: '.process-steps',
+    start: 'top 70%',
+    toggleActions: 'play none none reverse'
+  }
+});
+
+// CTA section elements
+const ctaTl = gsap.timeline({
+  scrollTrigger: {
+    trigger: '.cta-section',
+    start: 'top 60%',
+    toggleActions: 'play none none reverse'
+  }
+});
+
+ctaTl
+  .from('.cta-title', {
+    opacity: 0,
+    y: 40,
+    duration: 0.8,
+    ease: 'power3.out'
+  })
+  .from('.cta-desc', {
+    opacity: 0,
+    y: 30,
+    duration: 0.7,
+    ease: 'power3.out'
+  }, '-=0.5')
+  .from('.cta-button', {
+    opacity: 0,
+    y: 30,
+    scale: 0.9,
+    duration: 0.6,
+    ease: 'back.out(1.7)'
+  }, '-=0.4');
+
+// ════════════════════════════════════════════════════════════════
+//  Micro-interactions
+// ════════════════════════════════════════════════════════════════
+
+// Button hover effect
+document.querySelectorAll('.homepage-btn, .cta-button').forEach(btn => {
+  btn.addEventListener('mouseenter', () => {
+    gsap.to(btn, {
+      scale: 1.05,
+      duration: 0.3,
+      ease: 'back.out(1.7)'
+    });
+  });
+  btn.addEventListener('mouseleave', () => {
+    gsap.to(btn, {
+      scale: 1,
+      duration: 0.3,
+      ease: 'power2.out'
+    });
+  });
+});
+
+// Feature card hover effect
+document.querySelectorAll('.feature-card').forEach(card => {
+  card.addEventListener('mouseenter', () => {
+    gsap.to(card.querySelector('.feature-icon'), {
+      scale: 1.1,
+      rotation: -5,
+      duration: 0.4,
+      ease: 'back.out(1.7)'
+    });
+  });
+  card.addEventListener('mouseleave', () => {
+    gsap.to(card.querySelector('.feature-icon'), {
+      scale: 1,
+      rotation: 0,
+      duration: 0.3,
+      ease: 'power2.out'
+    });
   });
 });
 
