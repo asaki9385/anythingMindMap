@@ -727,6 +727,104 @@ gsap.registerPlugin(ScrollTrigger);
 })();
 
 // ════════════════════════════════════════════════════════════════
+//  Section Element Animations
+// ════════════════════════════════════════════════════════════════
+
+// Feature cards fade in with stagger
+gsap.utils.toArray('.feature-card').forEach((card, i) => {
+  gsap.to(card, {
+    opacity: 1,
+    y: 0,
+    duration: 0.8,
+    delay: i * 0.15,
+    ease: 'power2.out',
+    scrollTrigger: {
+      trigger: card,
+      start: 'top 80%',
+      toggleActions: 'play none none reverse'
+    }
+  });
+});
+
+// Process steps reveal sequentially
+gsap.utils.toArray('.process-step').forEach((step, i) => {
+  gsap.to(step, {
+    opacity: 1,
+    y: 0,
+    duration: 0.7,
+    delay: i * 0.2,
+    ease: 'power2.out',
+    scrollTrigger: {
+      trigger: '.process-section',
+      start: 'top 60%',
+      toggleActions: 'play none none reverse'
+    }
+  });
+});
+
+// Process connectors
+gsap.utils.toArray('.process-connector').forEach((conn, i) => {
+  gsap.to(conn, {
+    opacity: 1,
+    duration: 0.5,
+    delay: 0.3 + i * 0.2,
+    ease: 'power2.out',
+    scrollTrigger: {
+      trigger: '.process-section',
+      start: 'top 60%',
+      toggleActions: 'play none none reverse'
+    }
+  });
+});
+
+// CTA section elements
+const ctaElements = ['.cta-title', '.cta-desc', '.cta-button'];
+ctaElements.forEach((selector, i) => {
+  gsap.to(selector, {
+    opacity: 1,
+    y: 0,
+    duration: 0.8,
+    delay: i * 0.2,
+    ease: 'power2.out',
+    scrollTrigger: {
+      trigger: '.cta-section',
+      start: 'top 60%',
+      toggleActions: 'play none none reverse'
+    }
+  });
+});
+
+// Section titles
+gsap.utils.toArray('.section-title').forEach(title => {
+  gsap.from(title, {
+    opacity: 0,
+    y: 20,
+    duration: 0.6,
+    ease: 'power2.out',
+    scrollTrigger: {
+      trigger: title,
+      start: 'top 80%',
+      toggleActions: 'play none none reverse'
+    }
+  });
+});
+
+gsap.utils.toArray('.section-subtitle').forEach(subtitle => {
+  gsap.from(subtitle, {
+    opacity: 0,
+    y: 20,
+    duration: 0.6,
+    delay: 0.1,
+    ease: 'power2.out',
+    scrollTrigger: {
+      trigger: subtitle,
+      start: 'top 80%',
+      toggleActions: 'play none none reverse'
+    }
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
 //  Spider-Web Particle Animation
 // ════════════════════════════════════════════════════════════════
 
