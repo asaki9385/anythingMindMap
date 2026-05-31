@@ -219,6 +219,341 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .reveal-item { animation: none; opacity: 1; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   Scroll Section Styles
+   ════════════════════════════════════════════════════════════════ */
+
+.section-content {
+  max-width: 1100px;
+  width: 100%;
+  padding: 0 40px;
+  text-align: center;
+}
+
+.section-title {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: var(--weight-bold);
+  color: #2c2418;
+  margin-bottom: 8px;
+}
+
+.section-subtitle {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: #9a8b7e;
+  margin-bottom: 48px;
+}
+
+/* ── Hero Section ── */
+.hero-section {
+  background: #faf8f5;
+}
+
+.hero-section .homepage-content {
+  position: relative;
+  z-index: 1;
+}
+
+.scroll-hint {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  animation: fadeInHint 1s 1.5s forwards;
+}
+
+.scroll-hint-text {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: #9a8b7e;
+  letter-spacing: 0.1em;
+}
+
+.scroll-hint-arrow {
+  width: 20px;
+  height: 20px;
+  color: #9a8b7e;
+  animation: bounceDown 2s infinite;
+}
+
+@keyframes fadeInHint {
+  to { opacity: 1; }
+}
+
+@keyframes bounceDown {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(8px); }
+  60% { transform: translateY(4px); }
+}
+
+/* ── Features Section ── */
+.features-section {
+  background: #ffffff;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+.feature-card {
+  background: #faf8f5;
+  border: 1px solid rgba(44, 36, 24, 0.08);
+  border-radius: 16px;
+  padding: 36px 28px;
+  text-align: center;
+  transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
+  opacity: 0;
+  transform: translateY(40px);
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(44, 36, 24, 0.1);
+}
+
+.feature-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  color: #c07a2e;
+}
+
+.feature-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.feature-title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: var(--weight-bold);
+  color: #2c2418;
+  margin-bottom: 12px;
+}
+
+.feature-desc {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: #6b5b4e;
+  line-height: 1.7;
+}
+
+/* ── Process Section ── */
+.process-section {
+  background: #faf8f5;
+}
+
+.process-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.process-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  text-align: left;
+  flex: 1;
+  max-width: 280px;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.step-number {
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: var(--weight-bold);
+  color: #c07a2e;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: var(--weight-bold);
+  color: #2c2418;
+  margin-bottom: 8px;
+}
+
+.step-desc {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: #6b5b4e;
+  line-height: 1.7;
+}
+
+.process-connector {
+  width: 48px;
+  height: 2px;
+  background: linear-gradient(90deg, #c07a2e, #e8a84c);
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+/* ── CTA Section ── */
+.cta-section {
+  background: #2c2418;
+}
+
+.cta-title {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: var(--weight-bold);
+  color: #faf8f5;
+  margin-bottom: 16px;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.cta-desc {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  color: #9a8b7e;
+  margin-bottom: 40px;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 40px;
+  background: #e8a84c;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  border-radius: 9999px;
+  transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out), background 0.2s;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.cta-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 30px rgba(232, 168, 76, 0.4);
+  background: #f0bc6c;
+}
+
+.cta-arrow {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.3s var(--ease-out);
+}
+
+.cta-button:hover .cta-arrow {
+  transform: translateX(4px);
+}
+
+/* ── Responsive for scroll sections ── */
+@media (max-width: 768px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .process-steps {
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .process-connector {
+    width: 2px;
+    height: 32px;
+    background: linear-gradient(180deg, #c07a2e, #e8a84c);
+  }
+
+  .process-step {
+    max-width: 100%;
+  }
+
+  .section-title { font-size: 28px; }
+  .cta-title { font-size: 28px; }
+}
+
+@media (max-width: 480px) {
+  .section-content { padding: 0 24px; }
+  .section-title { font-size: 24px; }
+  .cta-title { font-size: 24px; }
+  .feature-card { padding: 28px 20px; }
+}
+
+/* ── Dark Mode ── */
+[data-theme="dark"] .hero-section {
+  background: #1a1814;
+}
+
+[data-theme="dark"] .features-section {
+  background: #242018;
+}
+
+[data-theme="dark"] .process-section {
+  background: #1a1814;
+}
+
+[data-theme="dark"] .section-title {
+  color: #e8e0d8;
+}
+
+[data-theme="dark"] .feature-card {
+  background: #2e2820;
+  border-color: rgba(232, 224, 216, 0.08);
+}
+
+[data-theme="dark"] .feature-title {
+  color: #e8e0d8;
+}
+
+[data-theme="dark"] .feature-desc {
+  color: #a89888;
+}
+
+[data-theme="dark"] .step-title {
+  color: #e8e0d8;
+}
+
+[data-theme="dark"] .step-desc {
+  color: #a89888;
+}
+
+[data-theme="dark"] .step-number {
+  color: #e8a84c;
+}
+
+[data-theme="dark"] .cta-section {
+  background: #0f0d0a;
+}
+
+[data-theme="dark"] .cta-title {
+  color: #faf8f5;
+}
+
+[data-theme="dark"] .cta-desc {
+  color: #706050;
+}
+
+[data-theme="dark"] .scroll-hint-text,
+[data-theme="dark"] .scroll-hint-arrow {
+  color: #706050;
+}
 </style>
 
 <!-- GSAP + ScrollTrigger -->
