@@ -245,6 +245,8 @@ body::before {
   margin-bottom: 12px;
   letter-spacing: 0.01em;
   will-change: transform, opacity;
+  opacity: 0;
+  transform: translateY(40px);
 }
 
 .section-subtitle {
@@ -254,6 +256,8 @@ body::before {
   margin-bottom: 56px;
   letter-spacing: 0.02em;
   will-change: transform, opacity;
+  opacity: 0;
+  transform: translateY(30px);
 }
 
 /* ── Hero Section ── */
@@ -435,7 +439,7 @@ body::before {
   flex: 1;
   max-width: 300px;
   opacity: 0;
-  transform: translateY(30px);
+  transform: translateX(-40px);
   will-change: transform, opacity;
 }
 
@@ -479,8 +483,11 @@ body::before {
   background: linear-gradient(90deg, #c07a2e, #e8a84c);
   flex-shrink: 0;
   opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left;
   position: relative;
   overflow: hidden;
+  will-change: transform, opacity;
 }
 
 .process-connector::after {
@@ -931,9 +938,9 @@ gsap.to('.scroll-hint', {
 
 // Section titles and subtitles
 gsap.utils.toArray('.section-title').forEach(title => {
-  gsap.from(title, {
-    opacity: 0,
-    y: 40,
+  gsap.to(title, {
+    opacity: 1,
+    y: 0,
     duration: 0.8,
     ease: 'power3.out',
     scrollTrigger: {
@@ -945,9 +952,9 @@ gsap.utils.toArray('.section-title').forEach(title => {
 });
 
 gsap.utils.toArray('.section-subtitle').forEach(subtitle => {
-  gsap.from(subtitle, {
-    opacity: 0,
-    y: 30,
+  gsap.to(subtitle, {
+    opacity: 1,
+    y: 0,
     duration: 0.7,
     delay: 0.1,
     ease: 'power3.out',
@@ -961,10 +968,10 @@ gsap.utils.toArray('.section-subtitle').forEach(subtitle => {
 
 // Feature cards with stagger
 const featureCards = gsap.utils.toArray('.feature-card');
-gsap.from(featureCards, {
-  opacity: 0,
-  y: 60,
-  scale: 0.95,
+gsap.to(featureCards, {
+  opacity: 1,
+  y: 0,
+  scale: 1,
   duration: 0.8,
   stagger: 0.15,
   ease: 'back.out(1.4)',
@@ -977,9 +984,9 @@ gsap.from(featureCards, {
 
 // Process steps with stagger
 const processSteps = gsap.utils.toArray('.process-step');
-gsap.from(processSteps, {
-  opacity: 0,
-  x: -40,
+gsap.to(processSteps, {
+  opacity: 1,
+  x: 0,
   duration: 0.7,
   stagger: 0.2,
   ease: 'power3.out',
@@ -992,9 +999,9 @@ gsap.from(processSteps, {
 
 // Process connectors with stagger
 const processConnectors = gsap.utils.toArray('.process-connector');
-gsap.from(processConnectors, {
-  scaleX: 0,
-  opacity: 0,
+gsap.to(processConnectors, {
+  scaleX: 1,
+  opacity: 1,
   duration: 0.5,
   stagger: 0.15,
   ease: 'power2.out',
@@ -1015,8 +1022,25 @@ const ctaTl = gsap.timeline({
 });
 
 ctaTl
-  .from('.cta-title', {
-    opacity: 0,
+  .to('.cta-title', {
+    opacity: 1,
+    y: 0,
+    duration: 0.8,
+    ease: 'power3.out'
+  })
+  .to('.cta-desc', {
+    opacity: 1,
+    y: 0,
+    duration: 0.7,
+    ease: 'power3.out'
+  }, '-=0.5')
+  .to('.cta-button', {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    duration: 0.6,
+    ease: 'back.out(1.7)'
+  }, '-=0.4');
     y: 40,
     duration: 0.8,
     ease: 'power3.out'
