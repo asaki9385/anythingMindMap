@@ -119,34 +119,39 @@ async def structure_text_chunk(client: httpx.AsyncClient, chunk: dict,
 
 
 def _extract_tail_context(tree: dict) -> str:
-    """Extract trailing leaf nodes from a tree for cross-chunk context bridging.
+    """提取末尾叶子节点的完整祖先路径，用于跨块主题连续性判断。"""
+    last_path = []
 
-    Collects all leaf nodes (no children), takes the last 3, and formats them
-    so the next chunk's LLM can see what immediately preceded it.
-    """
-    leaves = []
-
-    def _walk(node):
+    def _walk(node, path):
+        nonlocal last_path
+        current_path = path + [node.get("title", "")]
         children = node.get("children", [])
         if not children:
-            leaves.append({
-                "title": node.get("title", ""),
-                "content": node.get("content", ""),
-            })
+            last_path = current_path
         else:
             for child in children:
-                _walk(child)
+                _walk(child, current_path)
 
-    _walk(tree)
+    _walk(tree, [])
 
-    if not leaves:
+    if not last_path:
         return ""
 
-    tail = leaves[-3:]
-    lines = ["上文末尾知识点："]
-    for i, leaf in enumerate(tail, 1):
-        text = (leaf["content"] or "")[:150]
-        lines.append(f"{i}. {leaf['title']}: {text}" if text else f"{i}. {leaf['title']}")
+    last_leaf_content = ""
+    def _get_last_leaf_content(node):
+        nonlocal last_leaf_content
+        children = node.get("children", [])
+        if not children:
+            last_leaf_content = (node.get("content", "") or "")[:150]
+        else:
+            for child in children:
+                _get_last_leaf_content(child)
+    _get_last_leaf_content(tree)
+
+    lines = ["上文结尾知识路径（从大主题到细节）："]
+    lines.append(" → ".join(last_path[-4:]))
+    if last_leaf_content:
+        lines.append(f"末尾内容片段：{last_leaf_content}")
     return "\n".join(lines)
 
 

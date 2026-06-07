@@ -413,9 +413,7 @@ def repair_hierarchy(nodes: list[dict]) -> list[dict]:
                 effective_level = max(1, node.get('level', 1))
 
             node['level'] = effective_level
-            # Standalone nodes get sentinel category/depth that won't
-            # accidentally pop anything (highest category = lowest priority)
-            semantic_stack.append((effective_level, 99, 0, i))
+            # 无编号节点不压栈，避免阻断后续有编号节点的正确父级查找
 
     # ── Phase 4: Fix gaps in level continuity ──
     _fix_level_gaps(nodes)

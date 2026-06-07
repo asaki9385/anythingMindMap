@@ -26,7 +26,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
 from parser.pdf_splitter import split_pdf as split_pdf_fn, sanitize_filename
-from parser.text_extractor import docx_to_markdown, txt_to_markdown, split_large_text, has_heading_structure
+from parser.text_extractor import split_large_text, has_heading_structure
+from parser.markitdown_adapter import convert_to_markdown
 from parser.llm_structurer import structure_all_chunks
 from mineru_adapter.client import upload_and_process_all, download_markdowns
 
@@ -154,12 +155,10 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
     try:
         # ── Separate files by type ──
         pdf_files = [f for f in uploaded_files if detect_file_type(f['original_name']) == 'pdf']
-        word_files = [f for f in uploaded_files if detect_file_type(f['original_name']) == 'word']
-        txt_files = [f for f in uploaded_files if detect_file_type(f['original_name']) == 'text']
-        text_files = word_files + txt_files
+        non_pdf_files = [f for f in uploaded_files if detect_file_type(f['original_name']) != 'pdf']
 
         total = len(uploaded_files)
-        task.set_stage("splitting", 5, f"正在准备 {total} 个文档 ({len(pdf_files)} PDF, {len(word_files)} Word, {len(txt_files)} TXT)...")
+        task.set_stage("splitting", 5, f"正在准备 {total} 个文档 ({len(pdf_files)} PDF, {len(non_pdf_files)} 其他格式)...")
 
         # ── Stage 1: Prepare processing units ──
         all_units = []
@@ -170,9 +169,9 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
             pdf_units = _prepare_pdf_processing_units(pdf_files, work_dir, task)
             all_units.extend(pdf_units)
 
-        # Word/TXT units (already extracted to markdown)
-        if text_files:
-            text_units = _prepare_text_units(text_files, work_dir, task)
+        # Non-PDF units (Word, TXT, PPTX, XLSX, HTML, CSV, EPUB, etc. → MarkItDown → markdown)
+        if non_pdf_files:
+            text_units = _prepare_text_units(non_pdf_files, work_dir, task)
             all_units.extend(text_units)
             md_files.extend([u["path"] for u in text_units])
 
@@ -187,12 +186,12 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
 
         if pdf_units:
             if not mineru_token:
-                task.set_stage("ocr_converting", 20, "未提供MinerU Token，使用PyMuPDF提取PDF文本")
+                task.set_stage("ocr_converting", 20, "未提供MinerU Token，使用MarkItDown提取PDF文本")
                 md_dir = os.path.join(work_dir, "markdown")
                 os.makedirs(md_dir, exist_ok=True)
                 fallback_md = _fallback_pdf_to_md(pdf_units, md_dir)
                 md_files.extend(fallback_md)
-                task.set_stage("ocr_converting", 40, f"PyMuPDF提取完成，{len(fallback_md)} 个Markdown文件")
+                task.set_stage("ocr_converting", 40, f"MarkItDown提取完成，{len(fallback_md)} 个Markdown文件")
             else:
                 task.set_stage("ocr_converting", 20, f"正在识别 {len(pdf_units)} 个PDF...")
                 try:
@@ -202,7 +201,7 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
                     md_files.extend(ocr_md_files)
                     task.set_stage("ocr_converting", 40, f"MinerU识别完成，{len(ocr_md_files)} 个Markdown文件")
                 except Exception as e:
-                    task.set_stage("ocr_converting", 40, f"MinerU不可用 ({e})，回退到PyMuPDF")
+                    task.set_stage("ocr_converting", 40, f"MinerU不可用 ({e})，回退到MarkItDown")
                     md_dir = os.path.join(work_dir, "markdown")
                     os.makedirs(md_dir, exist_ok=True)
                     fallback_md = _fallback_pdf_to_md(pdf_units, md_dir)
@@ -359,73 +358,21 @@ def _prepare_pdf_processing_units(uploaded_pdfs: list[dict], work_dir: str, task
     return units
 
 
-def _extract_page_text_clean(page) -> str:
-    """Extract page text, filtering header/footer regions and reordering dual-column layouts."""
-    page_height = page.rect.height
-    page_width = page.rect.width
-
-    header_threshold = page_height * 0.08
-    footer_threshold = page_height * 0.92
-
-    blocks = page.get_text("blocks")  # (x0, y0, x1, y1, text, block_no, block_type)
-
-    in_content = []
-    for block in blocks:
-        x0, y0, x1, y1, text, *_ = block
-        text = text.strip()
-        if not text:
-            continue
-        if y1 < header_threshold or y0 > footer_threshold:
-            continue
-        if len(text) < 4 and text.isdigit():
-            continue
-        in_content.append(block)
-
-    if not in_content:
-        return ""
-
-    if len(in_content) < 4:
-        return "\n\n".join(b[4].strip() for b in in_content)
-
-    # Dual-column detection on remaining blocks
-    x_centers = sorted((b[0] + b[2]) / 2 for b in in_content)
-    max_gap = 0
-    split_idx = 0
-    for i in range(len(x_centers) - 1):
-        gap = x_centers[i + 1] - x_centers[i]
-        if gap > max_gap:
-            max_gap = gap
-            split_idx = i
-
-    if max_gap > page_width * 0.3 and split_idx >= 1 and split_idx < len(x_centers) - 2:
-        page_mid_x = page_width / 2
-        left = sorted([b for b in in_content if b[0] < page_mid_x], key=lambda b: b[1])
-        right = sorted([b for b in in_content if b[0] >= page_mid_x], key=lambda b: b[1])
-        left_text = "\n".join(b[4].strip() for b in left)
-        right_text = "\n".join(b[4].strip() for b in right)
-        return left_text + "\n" + right_text
-
-    return "\n\n".join(b[4].strip() for b in in_content)
-
-
 def _fallback_pdf_to_md(pdf_units: list[dict], output_dir: str) -> list:
-    """Fallback: extract text from PDFs using PyMuPDF when MinerU is unavailable."""
-    import fitz
+    """Fallback: extract text from PDFs using MarkItDown when MinerU is unavailable."""
     md_files = []
     for unit in pdf_units:
         pdf_path = unit["path"]
-        doc = fitz.open(pdf_path)
-        text_parts = []
-        for page in doc:
-            text = _extract_page_text_clean(page)
-            if text.strip():
-                text_parts.append(text)
-        doc.close()
+        try:
+            md_text = convert_to_markdown(pdf_path)
+        except Exception as e:
+            print(f"WARNING: MarkItDown failed for {pdf_path}: {e}")
+            md_text = ""
 
         basename = os.path.splitext(os.path.basename(pdf_path))[0]
         md_path = os.path.join(output_dir, f"{basename}.md")
         with open(md_path, "w", encoding="utf-8") as f:
-            f.write("\n\n".join(text_parts))
+            f.write(md_text)
         md_files.append(md_path)
     return md_files
 
@@ -435,18 +382,30 @@ def detect_file_type(filename: str) -> str:
     ext = Path(filename).suffix.lower()
     if ext == '.pdf':
         return 'pdf'
-    if ext == '.docx':
+    if ext in ('.docx', '.doc'):
         return 'word'
-    if ext == '.txt':
+    if ext in ('.txt', '.md', '.markdown'):
         return 'text'
+    if ext in ('.pptx', '.ppt'):
+        return 'presentation'
+    if ext in ('.xlsx', '.xls'):
+        return 'spreadsheet'
+    if ext in ('.html', '.htm'):
+        return 'html'
+    if ext == '.csv':
+        return 'csv'
+    if ext == '.epub':
+        return 'epub'
     return 'unknown'
 
 
 def _prepare_text_units(uploaded_files: list[dict], work_dir: str, task: TaskProgress) -> list[dict]:
-    """Process Word (.docx) and plain text (.txt) files into markdown units."""
+    """Process non-PDF files (Word, TXT, PPTX, XLSX, HTML, CSV, EPUB, etc.) into markdown units."""
     md_dir = os.path.join(work_dir, "markdown")
     os.makedirs(md_dir, exist_ok=True)
     units = []
+
+    SUPPORTED_TYPES = ('word', 'text', 'presentation', 'spreadsheet', 'html', 'csv', 'epub')
 
     for file_index, upload in enumerate(uploaded_files, start=1):
         file_path = upload["path"]
@@ -456,14 +415,11 @@ def _prepare_text_units(uploaded_files: list[dict], work_dir: str, task: TaskPro
         source_prefix = f"{file_index:02d}"
 
         try:
-            if file_type == 'word':
-                md_text = docx_to_markdown(file_path)
-                task.messages.append(f"[DOCX] {source_title}: 已提取Word文档内容")
-            elif file_type == 'text':
-                md_text = txt_to_markdown(file_path)
-                task.messages.append(f"[TXT] {source_title}: 已提取文本内容")
-            else:
+            if file_type not in SUPPORTED_TYPES:
                 continue
+            md_text = convert_to_markdown(file_path)
+            type_label = Path(original_name).suffix.upper().lstrip('.')
+            task.messages.append(f"[{type_label}] {source_title}: 已提取文档内容 (MarkItDown)")
 
             # Check if the text has good heading structure
             has_structure = has_heading_structure(md_text)
@@ -550,6 +506,7 @@ def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict 
     """Build tree JSONs from markdown files using tree_builder logic."""
     from tree_builder import parse_md_to_nodes, adjust_standalone_levels, build_tree
     from hierarchy_repair import apply_hierarchy_repair
+    from parser.ai_hierarchy_validator import ai_validate_with_source
 
     tree_dir = os.path.join(work_dir, "trees")
     os.makedirs(tree_dir, exist_ok=True)
@@ -565,15 +522,21 @@ def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict 
         nodes = parse_md_to_nodes(md_text)
         nodes = adjust_standalone_levels(nodes)
         nodes = apply_hierarchy_repair(nodes)
-        tree_children = build_tree(nodes)
 
-        # Validate hierarchy with LLM if API key is available
-        if api_key:
+        # AI 语义校验（有 api_key 且节点数 >= 5 时启用）
+        if api_key and len(nodes) >= 5:
             try:
-                from tree_builder import validate_and_repair_hierarchy
-                tree_children = validate_and_repair_hierarchy(tree_children, api_key)
+                nodes = asyncio.run(
+                    ai_validate_with_source(
+                        nodes=nodes,
+                        source_md=md_text,
+                        api_key=api_key,
+                    )
+                )
             except Exception as e:
-                print(f"  Hierarchy validation skipped for {filename}: {e}")
+                print(f"  [ai_validate] 跳过：{e}")
+
+        tree_children = build_tree(nodes)
 
         tree = {"title": unit_meta.get("unit_title", filename), "children": tree_children}
 
@@ -738,7 +701,7 @@ async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str) -> dict:
     Now includes adaptive profile detection and structural cleanup."""
     from node_enhancer import (
         build_prompt, get_context_text, should_enhance, collect_postorder,
-        detect_document_profile, cleanup_tree_structure,
+        detect_document_profile, cleanup_tree_structure, get_ancestor_path,
     )
 
     MAX_ENHANCE_NODES = 30
@@ -803,7 +766,8 @@ async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str) -> dict:
         nonlocal done_count, fail_count
         async with semaphore:
             await asyncio.sleep(REQUEST_DELAY)
-            prompt = build_prompt(node, SUBJECT_CONFIG, get_context_text(node), "", document_profile)
+            ancestor_path = get_ancestor_path(tree, node)
+            prompt = build_prompt(node, SUBJECT_CONFIG, get_context_text(node), "", document_profile, ancestor_path=ancestor_path)
             payload = {
                 "model": MODEL,
                 "max_tokens": 1000,
@@ -907,7 +871,7 @@ async def api_upload(
     task = TaskProgress(
         task_id,
         task_label,
-        mineru_token=mineru_token.strip() or None,
+        mineru_token=mineru_token.strip() or os.getenv("MINERU_API_KEY") or None,
         deepseek_api_key=deepseek_api_key.strip() or None,
     )
 
@@ -926,7 +890,7 @@ async def api_upload(
             f.write(content)
         uploaded_files.append({"path": file_path, "original_name": upload.filename})
         ft = detect_file_type(upload.filename)
-        type_label = {"pdf": "PDF", "word": "Word", "text": "TXT"}.get(ft, ft)
+        type_label = {"pdf": "PDF", "word": "Word", "text": "TXT", "presentation": "PPTX", "spreadsheet": "XLSX", "html": "HTML", "csv": "CSV", "epub": "EPUB"}.get(ft, ft)
         task.messages.append(f"文件已上传: [{type_label}] {upload.filename} ({len(content) / 1024 / 1024:.1f} MB)")
 
     with tasks_lock:

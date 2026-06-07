@@ -28,6 +28,7 @@ docs/
 
 # Root extras
 all_source_code.txt
+markitdown-main/
 check_deployment.py
 demo_complete_pipeline.py
 test_advanced_processing.py

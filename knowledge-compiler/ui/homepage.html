@@ -793,7 +793,7 @@ body::before {
             </svg>
           </div>
           <h3 class="feature-title">智能解析</h3>
-          <p class="feature-desc">AI 驱动的文档解析，自动提取结构化信息，支持 PDF、Word、Markdown 等多种格式</p>
+          <p class="feature-desc">MarkItDown 引擎驱动，支持 PDF、Word、PPTX、XLSX、HTML、CSV、EPUB 等 20+ 格式本地解析</p>
         </div>
         <div class="feature-card" data-feature="tree">
           <div class="feature-icon">
@@ -833,7 +833,7 @@ body::before {
           <div class="step-number">01</div>
           <div class="step-content">
             <h3 class="step-title">上传文档</h3>
-            <p class="step-desc">支持 PDF、Word、Markdown 等常见文档格式，拖拽或点击即可上传</p>
+            <p class="step-desc">支持 PDF、Word、PPTX、XLSX 等 20+ 格式，拖拽或点击即可上传</p>
           </div>
         </div>
         <div class="process-connector"></div>
@@ -841,7 +841,7 @@ body::before {
           <div class="step-number">02</div>
           <div class="step-content">
             <h3 class="step-title">AI 解析</h3>
-            <p class="step-desc">智能算法分析文档结构，提取关键信息，识别层级关系</p>
+            <p class="step-desc">MarkItDown 本地解析文档结构，可选 MinerU 云端 OCR 增强，AI 识别层级关系</p>
           </div>
         </div>
         <div class="process-connector"></div>
@@ -1038,23 +1038,6 @@ ctaTl
     opacity: 1,
     y: 0,
     scale: 1,
-    duration: 0.6,
-    ease: 'back.out(1.7)'
-  }, '-=0.4');
-    y: 40,
-    duration: 0.8,
-    ease: 'power3.out'
-  })
-  .from('.cta-desc', {
-    opacity: 0,
-    y: 30,
-    duration: 0.7,
-    ease: 'power3.out'
-  }, '-=0.5')
-  .from('.cta-button', {
-    opacity: 0,
-    y: 30,
-    scale: 0.9,
     duration: 0.6,
     ease: 'back.out(1.7)'
   }, '-=0.4');

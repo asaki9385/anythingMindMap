@@ -207,13 +207,17 @@ def describe_children_structure(node: dict) -> str:
 # ────────────────────────────────────────────
 
 def build_prompt(node: dict, subject_config: dict, context_text: str,
-                 surrounding_ctx: str = "", document_profile: dict | None = None) -> str:
+                 surrounding_ctx: str = "", document_profile: dict | None = None,
+                 ancestor_path: str = "") -> str:
     document_profile = document_profile or detect_document_profile({"title": node.get("title", ""), "children": [node]})
     node_role = infer_node_role(node)
     structure_guidance = describe_children_structure(node)
     ctx_block = ""
     if surrounding_ctx:
         ctx_block = f"\n## 上下文衔接\n{surrounding_ctx}\n"
+    path_block = ""
+    if ancestor_path:
+        path_block = f"\n【知识路径】{ancestor_path}\n"
 
     content_len = len(context_text)
     if content_len < 500:
@@ -231,7 +235,7 @@ def build_prompt(node: dict, subject_config: dict, context_text: str,
 资料类型: {document_profile['label']}
 节点角色: {node_role}
 结构提示: {structure_guidance}
-{ctx_block}
+{ctx_block}{path_block}
 ## 内容
 {context_text[:2000]}
 
@@ -309,10 +313,10 @@ def collect_postorder(node: dict, result: list):
 
 async def enhance_one(client: httpx.AsyncClient, node: dict,
                       semaphore: asyncio.Semaphore,
-                      surrounding_ctx: str = "") -> None:
+                      surrounding_ctx: str = "", ancestor_path: str = "") -> None:
     async with semaphore:
         await asyncio.sleep(REQUEST_DELAY)
-        prompt = build_prompt(node, SUBJECT_CONFIG, get_context_text(node), surrounding_ctx)
+        prompt = build_prompt(node, SUBJECT_CONFIG, get_context_text(node), surrounding_ctx, ancestor_path=ancestor_path)
         payload = {
             "model": MODEL,
             "max_tokens": 1500,
@@ -378,10 +382,10 @@ async def enhance_tree_async(tree: dict, global_index: list,
 
             tasks = []
             for node in batch:
-                # Find root-level title for context lookup
                 root_title = _find_root_title(tree, node)
                 ctx = get_surrounding_context(global_index, current_file, root_title)
-                tasks.append(enhance_one(client, node, semaphore, ctx))
+                ancestor_path = get_ancestor_path(tree, node)
+                tasks.append(enhance_one(client, node, semaphore, ctx, ancestor_path=ancestor_path))
 
             await asyncio.gather(*tasks)
 
@@ -403,6 +407,23 @@ def _contains_node(parent: dict, target: dict) -> bool:
         if _contains_node(c, target):
             return True
     return False
+
+def get_ancestor_path(tree: dict, target_node: dict) -> str:
+    """返回从根到目标节点的标题路径字符串，如：'第一章 心理发展 > 第二节 认知发展 > 皮亚杰理论'"""
+    path = []
+
+    def _search(node, current_path):
+        current_path = current_path + [node.get("title", "")]
+        if node is target_node:
+            path.extend(current_path)
+            return True
+        for child in node.get("children", []):
+            if _search(child, current_path):
+                return True
+        return False
+
+    _search(tree, [])
+    return " > ".join(path) if path else ""
 
 def count_enhanced(node):
     e = 1 if node.get('summary') else 0

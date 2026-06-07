@@ -1250,7 +1250,7 @@ body { overflow: hidden; }
     </div>
     <div id="chart" class="loading-placeholder">
       <span class="big-icon">📂</span>
-      <span>Upload one or more PDFs to generate the Knowledge Tree Mind Map</span>
+      <span>Upload documents to generate the Knowledge Tree Mind Map</span>
     </div>
   </div>
 
@@ -1281,9 +1281,9 @@ body { overflow: hidden; }
           <span class="drop-zone-primary">拖放文件到此处</span>
           <span class="drop-zone-secondary">或点击选择文件</span>
         </div>
-        <span class="drop-zone-hint">PDF, DOCX, TXT</span>
+        <span class="drop-zone-hint">PDF, DOCX, TXT, PPTX, XLSX, HTML, CSV, EPUB 等 20+ 格式</span>
       </div>
-      <input type="file" id="fileInput" accept=".pdf,.docx,.txt" multiple>
+      <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.pptx,.xlsx,.xls,.html,.csv,.epub,.md" multiple>
     </div>
 
     <div class="upload-file-list" id="fileList"></div>
@@ -1315,7 +1315,7 @@ body { overflow: hidden; }
         <button class="primary" onclick="saveConfig()">Save Config</button>
       </div>
       <div class="config-degradation-note">
-        <strong>Without MinerU token:</strong> PDFs processed with PyMuPDF text extraction.<br>
+        <strong>Without MinerU token:</strong> All documents parsed locally by MarkItDown (no API needed).<br>
         <strong>Without DeepSeek key:</strong> AI enhancement skipped.
       </div>
     </div>
@@ -1687,7 +1687,7 @@ function resetAndUpload() {
   document.getElementById('exportBtn').style.display = 'none';
   document.getElementById('spacingSlider').style.display = 'none';
   document.getElementById('chart').classList.add('loading-placeholder');
-  document.getElementById('chart').innerHTML = '<span class="big-icon">📂</span><span>Upload one or more PDFs to generate the Knowledge Tree Mind Map</span>';
+  document.getElementById('chart').innerHTML = '<span class="big-icon">📂</span><span>Upload documents to generate the Knowledge Tree Mind Map</span>';
   document.getElementById('stats').textContent = '';
   document.getElementById('infoPanel').classList.remove('show');
 

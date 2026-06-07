@@ -102,6 +102,105 @@ def get_text_sorted_by_columns(page) -> str:
     return left_text + "\n" + right_text
 
 
+def get_text_cleaned(pdf_path: str) -> str:
+    """Extract full PDF text with header/footer filtering and proper ordering.
+
+    Fixes cross-page text ordering issues:
+    - Detects repeated header/footer lines across pages and removes them
+    - Filters blocks in top/bottom margins (page numbers, running headers)
+    - Preserves proper reading order for single and dual-column layouts
+    """
+    doc = fitz.open(pdf_path)
+    page_count = doc.page_count
+
+    # ── Pass 1: Collect per-page blocks with position info ──
+    all_page_blocks = []  # list of list of (y0, y1, text, block_type)
+    for page_idx in range(page_count):
+        page = doc[page_idx]
+        page_height = page.rect.height
+        blocks = page.get_text("blocks")
+        page_blocks = []
+        for b in blocks:
+            x0, y0, x1, y1, text, block_no, block_type = b
+            text = text.strip()
+            if not text:
+                continue
+            # Mark blocks in top/bottom 8% of page as potential header/footer
+            is_header = y0 < page_height * 0.08
+            is_footer = y1 > page_height * 0.92
+            page_blocks.append({
+                "y0": y0, "y1": y1, "x0": x0, "x1": x1,
+                "text": text,
+                "is_header": is_header,
+                "is_footer": is_footer,
+                "page": page_idx,
+            })
+        all_page_blocks.append(page_blocks)
+
+    # ── Pass 2: Detect repeated headers/footers across pages ──
+    # A line that appears in the header/footer zone on 3+ pages is noise
+    header_footer_texts = set()
+    if page_count >= 3:
+        from collections import Counter
+        header_lines = Counter()
+        footer_lines = Counter()
+        for page_blocks in all_page_blocks:
+            for b in page_blocks:
+                normalized = re.sub(r'\s+', ' ', b["text"][:60].strip())
+                if not normalized:
+                    continue
+                if b["is_header"]:
+                    header_lines[normalized] += 1
+                if b["is_footer"]:
+                    footer_lines[normalized] += 1
+        # Lines appearing on 40%+ pages are headers/footers
+        threshold = max(3, page_count * 0.4)
+        for line, count in header_lines.items():
+            if count >= threshold:
+                header_footer_texts.add(line)
+        for line, count in footer_lines.items():
+            if count >= threshold:
+                header_footer_texts.add(line)
+
+    # ── Pass 3: Build cleaned text per page ──
+    page_texts = []
+    for page_idx, page_blocks in enumerate(all_page_blocks):
+        page = doc[page_idx]
+        # Sort by y-position (top to bottom), then x for same row
+        page_blocks.sort(key=lambda b: (b["y0"], b["x0"]))
+
+        # Detect dual-column
+        is_dual = detect_columns(page) < 2
+        if not is_dual:
+            page_mid_x = page.rect.width / 2
+            left = [b for b in page_blocks if b["x1"] < page_mid_x]
+            right = [b for b in page_blocks if b["x0"] >= page_mid_x]
+            # Also catch blocks spanning the midpoint into left
+            mid = [b for b in page_blocks if b not in left and b not in right]
+            left.extend(mid)
+            left.sort(key=lambda b: (b["y0"], b["x0"]))
+            right.sort(key=lambda b: (b["y0"], b["x0"]))
+            page_blocks = left + right
+
+        lines = []
+        for b in page_blocks:
+            # Skip known headers/footers
+            normalized = re.sub(r'\s+', ' ', b["text"][:60].strip())
+            if normalized in header_footer_texts:
+                continue
+            # Skip very short standalone numbers in header/footer zones
+            # (page numbers like "15", "- 15 -", "第15页")
+            if (b["is_header"] or b["is_footer"]) and len(b["text"]) <= 6:
+                if re.match(r'^[\d\-—·\s]+$', b["text"].strip()):
+                    continue
+            lines.append(b["text"])
+
+        page_texts.append("\n".join(lines))
+
+    doc.close()
+    return "\n\n".join(page_texts)
+
+
 def sanitize_filename(name: str) -> str:
     """Remove invalid characters from filename."""
     invalid_chars = '<>:"/\\|?*'

@@ -87,15 +87,25 @@ def detect_toc_section(lines, start_idx):
     return True, idx
 
 
+_ANY_NUMBERING_RE = re.compile(
+    r'^(第[一二三四五六七八九十百千\d]+[章节部分]|'
+    r'[一二三四五六七八九十]+[、，,]|'
+    r'[（(【〔][一二三四五六七八九十\d]+[）)】〕]|'
+    r'\d+(?:\.\d+)*[\.、，,)\s]|'
+    r'[①-⑳]|'
+    r'知识点[一二三四五六七八九十\d]+|'
+    r'(?:Chapter|Section|Part)\s+\d+)',
+    re.IGNORECASE,
+)
+
+
 def merge_split_chapter_titles(nodes):
-    """合并被拆分的章节标题。
+    """合并被拆分的标题（跨页断行）。
 
-    例如：
-      "# 第一章"
-      "# 心理发展与教育"
-
-    应该合并为：
-      "# 第一章 心理发展与教育"
+    处理两种情况：
+    1. "第一章" + "心理发展与教育" → "第一章 心理发展与教育"
+    2. "1.2.3 概念" + "的定义与特征" → "1.2.3 概念的定义与特征"
+       (编号标题被跨页切断，后半段无编号)
     """
     if not nodes:
         return nodes
@@ -106,27 +116,40 @@ def merge_split_chapter_titles(nodes):
         node = nodes[i]
         title = node.get('title', '')
 
-        # 检查是否是单独的章节标题（如 "第一章"）
+        # ── 情况1：单独的"第X章"标题 ──
         if _CHAPTER_TITLE_RE.match(title) and i + 1 < len(nodes):
             next_node = nodes[i + 1]
             next_title = next_node.get('title', '')
 
-            # 检查下一个节点是否是章节标题的一部分
-            # 且下一个节点没有自己的编号体系
             if (next_title and
-                not re.match(r'^第[一二三四五六七八九十百千\d]+[章节部分]', next_title) and
-                not re.match(r'^[一二三四五六七八九十]+[、，,]', next_title) and
-                not re.match(r'^[（(【〔][一二三四五六七八九十\d]+[）)】〕]', next_title) and
-                not re.match(r'^\d+(?:\.\d+)*', next_title) and
-                not re.match(r'^[①-⑳]', next_title) and
-                len(next_title) < 20):  # 标题长度限制
+                not _ANY_NUMBERING_RE.match(next_title) and
+                len(next_title) < 20):
 
-                # 合并标题
                 merged_title = f"{title} {next_title}"
                 merged_node = dict(node)
                 merged_node['title'] = merged_title
                 merged.append(merged_node)
-                i += 2  # 跳过下一个节点
+                i += 2
+                continue
+
+        # ── 情况2：任何带编号的标题 + 无编号的短续行 ──
+        # 处理 level 5/6 的细粒度标题跨页断行
+        if (_ANY_NUMBERING_RE.match(title) and len(title) < 80
+                and i + 1 < len(nodes)):
+            next_node = nodes[i + 1]
+            next_title = next_node.get('title', '')
+
+            # 下一个节点：无编号、较短、且当前标题看起来不完整（没有句号结尾）
+            if (next_title and
+                not _ANY_NUMBERING_RE.match(next_title) and
+                len(next_title) < 30 and
+                not re.search(r'[。.！!？?）)]$', title)):
+
+                merged_title = f"{title}{next_title}"
+                merged_node = dict(node)
+                merged_node['title'] = merged_title
+                merged.append(merged_node)
+                i += 2
                 continue
 
         merged.append(node)
@@ -144,13 +167,11 @@ def get_level(title, hashes):
     # English numbered sections: depth by number-segment count
     if re.match(r'^\d+\.\d+\.\d+\s', t): return 3
     if re.match(r'^\d+\.\d+\s', t): return 2
-    # 单独的 "数字. " 格式（如 "1. 弗洛伊德关于自我发展的理论"）
-    # 这种格式通常是知识点的子节点，应该使用更高的层级
-    if re.match(r'^\d+\.\s', t): return 5
+    if re.match(r'^\d+\.\s', t): return 1
     # Chinese comma-separated sub-points (e.g. "1、要点")
-    if re.match(r'^\d+[、]', t): return 5
+    if re.match(r'^\d+[、]', t): return 3
     # Other dotted numbered items without trailing space (e.g. "1.text")
-    if re.match(r'^\d+\.\s*\S', t): return 5
+    if re.match(r'^\d+\.\s*\S', t): return 1
     return min(hashes, 5)
 
 _EXPLICIT_LEVEL_RE = re.compile(
@@ -241,6 +262,43 @@ CAPTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 页码/脚注噪声模式
+_NOISE_LINE_RE = re.compile(
+    r'^('
+    r'[\-—\s]*\d+[\-—\s]*$'           # "- 15 -" 或纯数字页码
+    r'|第\s*\d+\s*页'                   # "第15页"
+    r'|[Pp]\.?\s*\d+'                   # "p.15" "P.15"
+    r'|\[\d+\]'                         # "[15]" 脚注引用
+    r'|\^?\[\d+\]'                      # "^[1]" 脚注标记
+    r'|^\d+\s*[）)]\s*$'               # "1)" 单行编号无内容
+    r'|(?:注|备注|附注)\s*[:：]\s*\d+'  # "注：1" 脚注
+    r')$'
+)
+
+
+def _clean_content_line(line: str) -> str | None:
+    """Clean a single content line. Returns None if line should be removed."""
+    s = line.strip()
+    if not s:
+        return line
+    # Remove standalone page numbers and footnote markers
+    if _NOISE_LINE_RE.match(s):
+        return None
+    # Remove lines that are just a single number or symbol (1-3 chars, likely artifact)
+    if len(s) <= 3 and re.match(r'^[\d①-⑳*·•\-—]+$', s):
+        return None
+    return line
+
+
+def _clean_content_buffer(buf: list[str]) -> str:
+    """Clean a content buffer, removing noise lines."""
+    cleaned = []
+    for line in buf:
+        result = _clean_content_line(line)
+        if result is not None:
+            cleaned.append(result)
+    return '\n'.join(cleaned).strip()
+
 
 def parse_md_to_nodes(md_text):
     lines = md_text.split('\n')
@@ -266,7 +324,7 @@ def parse_md_to_nodes(md_text):
         m = re.match(r'^(#{1,6})\s+(.+)', line)
         if m:
             if current is not None:
-                current['content'] = '\n'.join(buf).strip()
+                current['content'] = _clean_content_buffer(buf)
                 nodes.append(current)
                 buf = []
                 in_mermaid = False
@@ -348,7 +406,7 @@ def parse_md_to_nodes(md_text):
         i += 1
 
     if current is not None:
-        current['content'] = '\n'.join(buf).strip()
+        current['content'] = _clean_content_buffer(buf)
         nodes.append(current)
 
     # 合并被拆分的章节标题

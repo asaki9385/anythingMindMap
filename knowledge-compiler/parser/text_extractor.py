@@ -275,12 +275,21 @@ def _split_by_headers(md_text: str, max_chars: int) -> list[dict]:
             chunks.append(chunk_text)
 
     # If any chunk is still too large, sub-split by paragraphs
-    result = []
+    raw_chunks = []
     for chunk_text in chunks:
         if len(chunk_text) <= max_chars:
-            result.append(chunk_text)
+            raw_chunks.append(chunk_text)
         else:
-            result.extend([c["text"] for c in _split_by_paragraphs(chunk_text, max_chars)])
+            raw_chunks.extend([c["text"] for c in _split_by_paragraphs(chunk_text, max_chars)])
+
+    # 加入 overlap：每块开头附加上一块末尾的 300 字，提供跨块上下文
+    OVERLAP_CHARS = 300
+    result = []
+    for i, chunk_text in enumerate(raw_chunks):
+        if i > 0 and len(raw_chunks[i - 1]) > OVERLAP_CHARS:
+            overlap_prefix = raw_chunks[i - 1][-OVERLAP_CHARS:].strip()
+            chunk_text = f"<!-- 以下为承接上文的片段，勿重复提取 -->\n{overlap_prefix}\n<!-- 以下为本块正文 -->\n\n{chunk_text}"
+        result.append(chunk_text)
 
     # Assign metadata
     total = len(result)
