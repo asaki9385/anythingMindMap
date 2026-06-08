@@ -838,6 +838,42 @@ body { overflow: hidden; }
   </div>
 </div>
 
+<!-- ── Annotation Panel ── -->
+<div class="ann-panel" id="annotationPanel">
+  <div class="ann-panel-inner">
+    <div class="ann-header">
+      <span id="ann-node-title" class="ann-title"></span>
+      <button class="ann-close" onclick="closeAnnotationPanel()">&times;</button>
+    </div>
+    <div class="ann-row">
+      <label>Star</label>
+      <button id="ann-star-btn" onclick="toggleStar()">&#9734; Star</button>
+    </div>
+    <div class="ann-row">
+      <label>Status</label>
+      <div class="ann-status-btns">
+        <button id="btn-mastered" onclick="setAnnotationStatus('mastered')">Mastered</button>
+        <button id="btn-reviewing" onclick="setAnnotationStatus('reviewing')">Reviewing</button>
+        <button id="btn-clear" onclick="setAnnotationStatus(null)">Clear</button>
+      </div>
+    </div>
+    <div class="ann-row">
+      <label>Notes</label>
+      <textarea id="ann-note-input" placeholder="Write your understanding or memory tips..."
+                oninput="saveAnnotationNote(this.value)" rows="4"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- ── Progress Bar ── -->
+<div class="progress-container" id="progressContainer" style="display:none;">
+  <div class="progress-track">
+    <div id="progress-bar-mastered" class="progress-seg seg-mastered" style="width:0%"></div>
+    <div id="progress-bar-reviewing" class="progress-seg seg-reviewing" style="width:0%"></div>
+  </div>
+  <span id="progress-label" class="progress-label"></span>
+</div>
+
 <div class="spacing-slider" id="spacingSlider" title="Drag to adjust node spacing">
   <div class="spacing-row">
     <label class="spacing-label">Width</label>
@@ -852,6 +888,7 @@ body { overflow: hidden; }
 </div>
 
 <script src="common.js"></script>
+<script src="annotation.js"></script>
 <script>
 // ── Theme ──
 KT.initTheme();
@@ -1303,6 +1340,87 @@ function restoreTreeState() {
   else walk(treeData);
 }
 
+// ── Annotation ──
+let _currentNodeId = null;
+let _currentNodeData = null;
+let _noteTimer = null;
+let _allNodeIds = [];
+
+function openAnnotationPanel(node, parentTitle) {
+  _currentNodeData = node;
+  _currentNodeId = KT.getNodeId(node, parentTitle);
+  const ann = AnnotationManager.get(_currentNodeId);
+
+  document.getElementById('ann-node-title').textContent = node.title || node.name;
+  document.getElementById('ann-star-btn').innerHTML = ann.star ? '⭐ Starred' : '☆ Star';
+  document.getElementById('ann-note-input').value = ann.note || '';
+
+  document.getElementById('btn-mastered').classList.toggle('active-success', ann.status === 'mastered');
+  document.getElementById('btn-reviewing').classList.toggle('active-warning', ann.status === 'reviewing');
+
+  document.getElementById('annotationPanel').classList.add('open');
+}
+
+function closeAnnotationPanel() {
+  document.getElementById('annotationPanel').classList.remove('open');
+  _currentNodeId = null;
+  _currentNodeData = null;
+}
+
+function toggleStar() {
+  if (!_currentNodeId) return;
+  const current = AnnotationManager.get(_currentNodeId).star;
+  AnnotationManager.setStar(_currentNodeId, !current);
+  document.getElementById('ann-star-btn').innerHTML = !current ? '⭐ Starred' : '☆ Star';
+  refreshAnnotationVisuals();
+}
+
+function setAnnotationStatus(value) {
+  if (!_currentNodeId) return;
+  AnnotationManager.setStatus(_currentNodeId, value);
+  document.getElementById('btn-mastered').classList.toggle('active-success', value === 'mastered');
+  document.getElementById('btn-reviewing').classList.toggle('active-warning', value === 'reviewing');
+  refreshAnnotationVisuals();
+}
+
+function saveAnnotationNote(text) {
+  if (!_currentNodeId) return;
+  clearTimeout(_noteTimer);
+  _noteTimer = setTimeout(function() {
+    AnnotationManager.setNote(_currentNodeId, text);
+    refreshAnnotationVisuals();
+  }, 600);
+}
+
+function refreshAnnotationVisuals() {
+  if (!chart || !treeData) return;
+  renderChart(currentLayout, currentExpandLevel);
+  renderProgressBar();
+}
+
+function collectAllNodeIds(node, parentTitle) {
+  parentTitle = parentTitle || '';
+  var ids = [KT.getNodeId(node, parentTitle)];
+  if (node.children) {
+    node.children.forEach(function(child) {
+      ids = ids.concat(collectAllNodeIds(child, node.title || node.name || ''));
+    });
+  }
+  return ids;
+}
+
+function renderProgressBar() {
+  if (!_allNodeIds.length) return;
+  var stats = AnnotationManager.getStats(_allNodeIds);
+  var masteredPct = stats.total ? Math.round(stats.mastered / stats.total * 100) : 0;
+  var reviewingPct = stats.total ? Math.round(stats.reviewing / stats.total * 100) : 0;
+
+  document.getElementById('progress-bar-mastered').style.width = masteredPct + '%';
+  document.getElementById('progress-bar-reviewing').style.width = reviewingPct + '%';
+  document.getElementById('progress-label').textContent =
+    'Mastered ' + stats.mastered + '/' + stats.total + '  Reviewing ' + stats.reviewing + '  Starred ' + stats.starred;
+}
+
 // ── Chart Init ──
 async function initChart() {
   const chartContainer = document.getElementById('chart');
@@ -1313,6 +1431,9 @@ async function initChart() {
     allNodes = [];
     flattenNodes(treeData, []);
 
+    _allNodeIds = collectAllNodeIds(treeData);
+    AnnotationManager.init(treeData.title || treeData.name || 'default');
+
     const totalNodes = allNodes.length;
     const partCount = (treeData.children || []).length;
     const enhancedCount = allNodes.filter(n => n.node.summary && n.node.summary.length > 0).length;
@@ -1322,6 +1443,9 @@ async function initChart() {
     document.getElementById('searchToggleBtn').style.display = 'flex';
     renderChart(currentLayout, currentExpandLevel);
     initSpacingSlider();
+
+    document.getElementById('progressContainer').style.display = 'flex';
+    renderProgressBar();
 
     document.getElementById('layoutSelect').addEventListener('change', (e) => {
       currentLayout = e.target.value;
@@ -1342,6 +1466,7 @@ async function initChart() {
       }
       if (params.componentSubType === 'tree') {
         showNodeInfo(params.data);
+        openAnnotationPanel(params.data, params.data._parentTitle || '');
       }
     });
 
