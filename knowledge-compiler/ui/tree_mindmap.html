@@ -829,6 +829,8 @@ body { overflow: hidden; }
       <span class="spinner"></span>
       <span>Loading knowledge tree...</span>
     </div>
+    <input type="text" class="inline-editor" id="inlineEditor" />
+    <div class="edit-hint" id="editHint">Enter to save &middot; Esc to cancel &middot; Click canvas to confirm</div>
   </div>
   <div class="info-panel" id="infoPanel">
     <button class="close-btn" onclick="closePanel()" title="Close (Esc)">&times;</button>
@@ -859,18 +861,6 @@ body { overflow: hidden; }
       <label>Notes</label>
       <textarea id="ann-note-input" placeholder="Write your understanding or memory tips..."
                 oninput="saveAnnotationNote(this.value)" rows="4"></textarea>
-    </div>
-    <!-- ── Q&A Section ── -->
-    <div class="qa-divider"></div>
-    <div class="qa-section">
-      <label>&#129302; Ask AI (based on this node)</label>
-      <textarea id="qa-input" placeholder="e.g. What is the difference between this concept and Piaget's theory?"
-                rows="3" onkeydown="handleQaKeydown(event)"></textarea>
-      <button id="qa-submit-btn" class="primary" onclick="submitQuestion()">Send</button>
-      <div id="qa-answer-box" style="display:none;">
-        <div class="qa-answer-label">AI Answer:</div>
-        <div id="qa-answer-text"></div>
-      </div>
     </div>
   </div>
 </div>
@@ -1019,6 +1009,14 @@ function applyThemeColors() {
   document.querySelectorAll('.info-panel .caption-item').forEach(function(el) { el.style.background = c.canvas; el.style.color = c.ink2; });
   document.querySelectorAll('.sum-hl').forEach(function(el) { el.style.color = c.accentH; el.style.background = c.keywordBg; });
 
+  // Inline editor
+  var ie = document.getElementById('inlineEditor');
+  if (ie) { ie.style.background = c.raised; ie.style.color = c.accent; ie.style.borderColor = c.accent; }
+
+  // Edit hint
+  var eh = document.getElementById('editHint');
+  if (eh) { eh.style.background = c.tagAccentBg; eh.style.borderColor = c.borderA; eh.style.color = c.accent; }
+
   // Content editor
   document.querySelectorAll('.content-edit-btn').forEach(function(el) { el.style.background = c.tagAccentBg; el.style.color = c.accentH; el.style.borderColor = c.borderA; });
   document.querySelectorAll('.content-edit-bar').forEach(function(el) { el.style.background = c.raised; el.style.borderColor = c.border; });
@@ -1133,6 +1131,11 @@ const SPACING_MAX = 300;
 let searchExpanded = false;
 
 // Edit state
+let editState = {
+  active: false,
+  nodeData: null,
+  inputEl: null
+};
 let currentDisplayNode = null;
 const API_BASE = window.location.port === '8700' ? '' : 'http://localhost:8700';
 
@@ -1344,10 +1347,8 @@ function restoreTreeState() {
 let _currentNodeId = null;
 let _noteTimer = null;
 let _allNodeIds = [];
-let _currentNodeRaw = null;
 
 function openAnnotationPanel(node, parentTitle) {
-  _currentNodeRaw = node;
   _currentNodeId = KT.getNodeId(node, parentTitle);
   const ann = AnnotationManager.get(_currentNodeId);
 
@@ -1364,7 +1365,6 @@ function openAnnotationPanel(node, parentTitle) {
 function closeAnnotationPanel() {
   document.getElementById('annotationPanel').classList.remove('open');
   _currentNodeId = null;
-  _currentNodeRaw = null;
 }
 
 function toggleStar() {
@@ -1422,83 +1422,6 @@ function renderProgressBar() {
     'Mastered ' + stats.mastered + '/' + stats.total + '  Reviewing ' + stats.reviewing + '  Starred ' + stats.starred;
 }
 
-// ── Q&A ──
-function collectNodeContext(node) {
-  var lines = [];
-  function walk(n, depth) {
-    var indent = '  '.repeat(depth);
-    lines.push(indent + '【' + (n.title || n.name || '') + '】');
-    if (n.content) lines.push(indent + n.content);
-    if (n.children && n.children.length) {
-      n.children.forEach(function(child) { walk(child, depth + 1); });
-    }
-  }
-  walk(node, 0);
-  return lines.join('\n');
-}
-
-async function submitQuestion() {
-  var question = document.getElementById('qa-input').value.trim();
-  if (!question) return;
-
-  var btn = document.getElementById('qa-submit-btn');
-  var answerBox = document.getElementById('qa-answer-box');
-  var answerText = document.getElementById('qa-answer-text');
-
-  btn.disabled = true;
-  btn.textContent = 'Thinking...';
-  answerBox.style.display = 'block';
-  answerText.textContent = '';
-
-  var nodeContext = collectNodeContext(_currentNodeRaw);
-  var apiKey = '';
-
-  try {
-    var resp = await fetch('/api/node-qa', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: question, node_context: nodeContext, api_key: apiKey })
-    });
-
-    if (!resp.ok) {
-      var errData = await resp.json();
-      answerText.textContent = errData.error || 'Server error (' + resp.status + ')';
-      return;
-    }
-
-    var reader = resp.body.getReader();
-    var decoder = new TextDecoder();
-
-    while (true) {
-      var result = await reader.read();
-      if (result.done) break;
-      var text = decoder.decode(result.value);
-      var chunks = text.split('\n');
-      for (var i = 0; i < chunks.length; i++) {
-        var line = chunks[i];
-        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-          try {
-            var chunk = JSON.parse(line.slice(6));
-            answerText.textContent += chunk.text || '';
-          } catch (e) {}
-        }
-      }
-    }
-  } catch (e) {
-    answerText.textContent = 'Request failed. Check network or API Key.';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Send';
-  }
-}
-
-function handleQaKeydown(e) {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    submitQuestion();
-  }
-}
-
 // ── Chart Init ──
 async function initChart() {
   const chartContainer = document.getElementById('chart');
@@ -1536,6 +1459,12 @@ async function initChart() {
     });
 
     chart.on('click', (params) => {
+      if (editState.active) {
+        if (params.componentSubType === 'tree' && params.data !== editState.nodeData) {
+          saveEdit(editState.inputEl.value);
+        }
+        return;
+      }
       if (params.componentSubType === 'tree') {
         showNodeInfo(params.data);
         openAnnotationPanel(params.data, params.data._parentTitle || '');
@@ -1544,10 +1473,24 @@ async function initChart() {
 
     chart.on('dblclick', (params) => {
       if (params.componentSubType === 'tree') {
-        var nodeId = KT.getNodeId(params.data, params.data._parentTitle || '');
-        var ann = AnnotationManager.get(nodeId);
-        AnnotationManager.setStatus(nodeId, ann.status === 'mastered' ? null : 'mastered');
-        refreshAnnotationVisuals();
+        startEdit(params.data, params.event);
+      }
+    });
+
+    document.getElementById('chartContainer').addEventListener('mousedown', function(e) {
+      if (!editState.active) return;
+      if (e.target === document.getElementById('inlineEditor')) return;
+      saveEdit(editState.inputEl.value);
+    });
+
+    document.getElementById('inlineEditor').addEventListener('keydown', function(e) {
+      if (!editState.active) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveEdit(this.value);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelEdit();
       }
     });
 
@@ -1946,6 +1889,86 @@ function collapseAll() {
 
 function getSourceFile(nodeData) {
   return nodeData._sourceFile || '';
+}
+
+function startEdit(nodeData, event) {
+  if (editState.active) {
+    saveEdit(editState.inputEl.value);
+  }
+
+  const input = document.getElementById('inlineEditor');
+  const hint = document.getElementById('editHint');
+
+  const container = document.getElementById('chartContainer');
+  const rect = container.getBoundingClientRect();
+  const left = event.clientX - rect.left - 90;
+  const top = event.clientY - rect.top - 14;
+  input.style.left = Math.max(4, left) + 'px';
+  input.style.top = Math.max(4, top) + 'px';
+  input.value = nodeData.name || '';
+  input.classList.add('active');
+  hint.classList.add('active');
+
+  input.focus();
+  input.select();
+
+  editState.active = true;
+  editState.nodeData = nodeData;
+  editState.inputEl = input;
+}
+
+async function saveEdit(newTitle) {
+  if (!editState.active) return;
+
+  newTitle = (newTitle || '').trim();
+  const nodeData = editState.nodeData;
+
+  if (!newTitle || newTitle === nodeData.name) {
+    cleanupEdit();
+    return;
+  }
+
+  nodeData.name = newTitle;
+  nodeData.title = newTitle;
+
+  const sourceFile = getSourceFile(nodeData);
+  if (sourceFile) {
+    try {
+      const resp = await fetch(`${API_BASE}/api/update-node`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: sourceFile,
+          path: nodeData._pathInFile || [],
+          title: newTitle
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        console.warn('Save to server failed:', err.error || resp.status);
+      }
+    } catch (e) {
+      console.warn('Save to server failed:', e.message);
+    }
+  }
+
+  cleanupEdit();
+  renderChart(currentLayout, currentExpandLevel);
+}
+
+function cancelEdit() {
+  if (!editState.active) return;
+  cleanupEdit();
+}
+
+function cleanupEdit() {
+  const input = document.getElementById('inlineEditor');
+  const hint = document.getElementById('editHint');
+  input.classList.remove('active');
+  hint.classList.remove('active');
+  editState.active = false;
+  editState.nodeData = null;
+  editState.inputEl = null;
 }
 
 // ── Search ──

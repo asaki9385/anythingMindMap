@@ -582,12 +582,9 @@ function applyAnnotationStyles(echartsNodes, filename) {
     if (ann.star) displayName = '⭐ ' + displayName;
 
     var itemStyle = Object.assign({}, node.itemStyle || {});
-    var label = Object.assign({}, node.label || {});
     if (ann.status === 'mastered') {
       itemStyle.borderColor = 'var(--success)';
       itemStyle.borderWidth = 2;
-      label.decoration = 'line-through';
-      label.opacity = 0.6;
     } else if (ann.status === 'reviewing') {
       itemStyle.borderColor = 'var(--warning)';
       itemStyle.borderWidth = 2;
@@ -598,7 +595,6 @@ function applyAnnotationStyles(echartsNodes, filename) {
     var result = Object.assign({}, node, {
       name: displayName,
       itemStyle: itemStyle,
-      label: label,
       _nodeId: nodeId
     });
 
