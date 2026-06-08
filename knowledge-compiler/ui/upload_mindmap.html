@@ -1872,6 +1872,14 @@ function initChart() {
       openAnnotationPanel(params.data, params.data._parentTitle || '');
     }
   });
+  chart.on('dblclick', function(params) {
+    if (params.componentSubType === 'tree') {
+      var nodeId = KT.getNodeId(params.data, params.data._parentTitle || '');
+      var ann = AnnotationManager.get(nodeId);
+      AnnotationManager.setStatus(nodeId, ann.status === 'mastered' ? null : 'mastered');
+      refreshAnnotationVisuals();
+    }
+  });
   window.addEventListener('resize', function() {
     if (chart) chart.resize();
   });
