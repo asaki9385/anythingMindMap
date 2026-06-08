@@ -860,6 +860,18 @@ body { overflow: hidden; }
       <textarea id="ann-note-input" placeholder="Write your understanding or memory tips..."
                 oninput="saveAnnotationNote(this.value)" rows="4"></textarea>
     </div>
+    <!-- ── Q&A Section ── -->
+    <div class="qa-divider"></div>
+    <div class="qa-section">
+      <label>&#129302; Ask AI (based on this node)</label>
+      <textarea id="qa-input" placeholder="e.g. What is the difference between this concept and Piaget's theory?"
+                rows="3" onkeydown="handleQaKeydown(event)"></textarea>
+      <button id="qa-submit-btn" class="primary" onclick="submitQuestion()">Send</button>
+      <div id="qa-answer-box" style="display:none;">
+        <div class="qa-answer-label">AI Answer:</div>
+        <div id="qa-answer-text"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1332,8 +1344,10 @@ function restoreTreeState() {
 let _currentNodeId = null;
 let _noteTimer = null;
 let _allNodeIds = [];
+let _currentNodeRaw = null;
 
 function openAnnotationPanel(node, parentTitle) {
+  _currentNodeRaw = node;
   _currentNodeId = KT.getNodeId(node, parentTitle);
   const ann = AnnotationManager.get(_currentNodeId);
 
@@ -1350,6 +1364,7 @@ function openAnnotationPanel(node, parentTitle) {
 function closeAnnotationPanel() {
   document.getElementById('annotationPanel').classList.remove('open');
   _currentNodeId = null;
+  _currentNodeRaw = null;
 }
 
 function toggleStar() {
@@ -1405,6 +1420,77 @@ function renderProgressBar() {
   document.getElementById('progress-bar-reviewing').style.width = reviewingPct + '%';
   document.getElementById('progress-label').textContent =
     'Mastered ' + stats.mastered + '/' + stats.total + '  Reviewing ' + stats.reviewing + '  Starred ' + stats.starred;
+}
+
+// ── Q&A ──
+function collectNodeContext(node) {
+  var lines = [];
+  function walk(n, depth) {
+    var indent = '  '.repeat(depth);
+    lines.push(indent + '【' + (n.title || n.name || '') + '】');
+    if (n.content) lines.push(indent + n.content);
+    if (n.children && n.children.length) {
+      n.children.forEach(function(child) { walk(child, depth + 1); });
+    }
+  }
+  walk(node, 0);
+  return lines.join('\n');
+}
+
+async function submitQuestion() {
+  var question = document.getElementById('qa-input').value.trim();
+  if (!question) return;
+
+  var btn = document.getElementById('qa-submit-btn');
+  var answerBox = document.getElementById('qa-answer-box');
+  var answerText = document.getElementById('qa-answer-text');
+
+  btn.disabled = true;
+  btn.textContent = 'Thinking...';
+  answerBox.style.display = 'block';
+  answerText.textContent = '';
+
+  var nodeContext = collectNodeContext(_currentNodeRaw);
+  var apiKey = '';
+
+  try {
+    var resp = await fetch('/api/node-qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: question, node_context: nodeContext, api_key: apiKey })
+    });
+
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+
+    while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+      var text = decoder.decode(result.value);
+      var chunks = text.split('\n');
+      for (var i = 0; i < chunks.length; i++) {
+        var line = chunks[i];
+        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+          try {
+            var chunk = JSON.parse(line.slice(6));
+            answerText.textContent += chunk.text || '';
+          } catch (e) {}
+        }
+      }
+    }
+  } catch (e) {
+    answerText.textContent = 'Request failed. Check network or API Key.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send';
+  }
+}
+
+function handleQaKeydown(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    submitQuestion();
+  }
 }
 
 // ── Chart Init ──
