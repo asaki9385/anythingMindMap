@@ -399,8 +399,9 @@ async function postRenderMathAndMermaid(container) {
 
 // ── Tree Data Transform ──
 
-function transformNode(node, depth) {
+function transformNode(node, depth, parentTitle) {
   depth = depth || 0;
+  parentTitle = parentTitle || '';
   var name = node.title || node.name || 'Untitled';
   var transformed = {
     name: name,
@@ -414,18 +415,21 @@ function transformNode(node, depth) {
     mermaid: node.mermaid || '',
     tables: node.tables || [],
     captions: node.captions || [],
+    _parentTitle: parentTitle,
     children: []
   };
   if (node.children && Array.isArray(node.children) && node.children.length > 0) {
+    var currentTitle = node.title || node.name || '';
     transformed.children = node.children.map(function(child) {
-      return transformNode(child, depth + 1);
+      return transformNode(child, depth + 1, currentTitle);
     });
   }
   return transformed;
 }
 
-function transformNodeWithPath(node, targetPath, depth) {
+function transformNodeWithPath(node, targetPath, depth, parentTitle) {
   depth = depth || 0;
+  parentTitle = parentTitle || '';
   var name = node.title || node.name || 'Untitled';
   var isTarget = (depth === targetPath.length - 1 && name === targetPath[depth]);
   var isAncestor = (depth < targetPath.length - 1 && name === targetPath[depth]);
@@ -443,13 +447,15 @@ function transformNodeWithPath(node, targetPath, depth) {
     mermaid: node.mermaid || '',
     tables: node.tables || [],
     captions: node.captions || [],
+    _parentTitle: parentTitle,
     children: []
   };
 
   if (hasChildren) {
+    var currentTitle = node.title || node.name || '';
     transformed.collapsed = !isAncestor;
     transformed.children = node.children.map(function(child) {
-      return transformNodeWithPath(child, targetPath, depth + 1);
+      return transformNodeWithPath(child, targetPath, depth + 1, currentTitle);
     });
   }
 
@@ -568,7 +574,7 @@ function applyAnnotationStyles(echartsNodes, filename) {
   if (typeof AnnotationManager === 'undefined') return echartsNodes;
   AnnotationManager.init(filename);
 
-  return echartsNodes.map(function(node) {
+  function applyNode(node) {
     var nodeId = getNodeId(node, node._parentTitle || '');
     var ann = AnnotationManager.get(nodeId);
 
@@ -586,12 +592,20 @@ function applyAnnotationStyles(echartsNodes, filename) {
 
     if (ann.note && ann.note.trim()) displayName += ' 📝';
 
-    return Object.assign({}, node, {
+    var result = Object.assign({}, node, {
       name: displayName,
       itemStyle: itemStyle,
       _nodeId: nodeId
     });
-  });
+
+    if (node.children && node.children.length) {
+      result.children = node.children.map(applyNode);
+    }
+
+    return result;
+  }
+
+  return echartsNodes.map(applyNode);
 }
 
 // ── Exports ──

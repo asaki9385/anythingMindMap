@@ -1898,6 +1898,10 @@ function renderChart(layout, expandLevel, targetPath) {
     transformed = KT.transformNode(treeData);
   }
 
+  var filename = treeData.title || treeData.name || 'default';
+  var styled = KT.applyAnnotationStyles([transformed], filename);
+  transformed = styled[0];
+
   var option = {
     backgroundColor: 'transparent',
     tooltip: {

@@ -1140,9 +1140,10 @@ let currentDisplayNode = null;
 const API_BASE = window.location.port === '8700' ? '' : 'http://localhost:8700';
 
 // ── Tree Transform (page-specific: adds _pathInFile for edit support) ──
-function transformNode(node, depth, pathInFile) {
+function transformNode(node, depth, pathInFile, parentTitle) {
   depth = depth || 0;
   pathInFile = pathInFile || [];
+  parentTitle = parentTitle || '';
   var name = node.title || node.name || 'Untitled';
   var transformed = {
     name: name,
@@ -1157,12 +1158,14 @@ function transformNode(node, depth, pathInFile) {
     tables: node.tables || [],
     captions: node.captions || [],
     _pathInFile: pathInFile,
+    _parentTitle: parentTitle,
     children: []
   };
 
   if (node.children && Array.isArray(node.children) && node.children.length > 0) {
+    var currentTitle = node.title || node.name || '';
     transformed.children = node.children.map(function(child, idx) {
-      return transformNode(child, depth + 1, pathInFile.concat([idx]));
+      return transformNode(child, depth + 1, pathInFile.concat([idx]), currentTitle);
     });
   }
 
@@ -1521,6 +1524,9 @@ function renderChart(layout, expandLevel, targetPath) {
   } else {
     data = [treeData];
   }
+
+  var filename = treeData.title || treeData.name || 'default';
+  data = KT.applyAnnotationStyles(data, filename);
 
   var themeAccent = KT.getTheme() === 'light' ? '#c07a2e' : '#e8a84c';
   var lineColor = KT.getTheme() === 'light' ? 'rgba(192, 122, 46, 0.15)' : 'rgba(232, 168, 76, 0.15)';
