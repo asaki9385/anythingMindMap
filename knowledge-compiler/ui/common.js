@@ -551,6 +551,49 @@ function formatSize(bytes) {
   return (bytes / 1024 / 1024).toFixed(1) + ' MB';
 }
 
+// ── Annotation Helpers ──
+
+function getNodeId(node, parentTitle) {
+  parentTitle = parentTitle || '';
+  var raw = parentTitle + '::' + (node.level || 0) + '::' + (node.title || node.name || '');
+  var hash = 5381;
+  for (var i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) + hash) + raw.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return 'node_' + Math.abs(hash);
+}
+
+function applyAnnotationStyles(echartsNodes, filename) {
+  if (typeof AnnotationManager === 'undefined') return echartsNodes;
+  AnnotationManager.init(filename);
+
+  return echartsNodes.map(function(node) {
+    var nodeId = getNodeId(node, node._parentTitle || '');
+    var ann = AnnotationManager.get(nodeId);
+
+    var displayName = node.name;
+    if (ann.star) displayName = '⭐ ' + displayName;
+
+    var itemStyle = Object.assign({}, node.itemStyle || {});
+    if (ann.status === 'mastered') {
+      itemStyle.borderColor = 'var(--success)';
+      itemStyle.borderWidth = 2;
+    } else if (ann.status === 'reviewing') {
+      itemStyle.borderColor = 'var(--warning)';
+      itemStyle.borderWidth = 2;
+    }
+
+    if (ann.note && ann.note.trim()) displayName += ' 📝';
+
+    return Object.assign({}, node, {
+      name: displayName,
+      itemStyle: itemStyle,
+      _nodeId: nodeId
+    });
+  });
+}
+
 // ── Exports ──
 
 global.KT = {
@@ -590,6 +633,9 @@ global.KT = {
   // Search
   searchNodes: searchNodes,
   highlightSearchMatch: highlightSearchMatch,
+  // Annotation
+  getNodeId: getNodeId,
+  applyAnnotationStyles: applyAnnotationStyles,
   // Toast
   showToast: showToast,
   // Helpers
