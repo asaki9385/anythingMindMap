@@ -2607,6 +2607,12 @@ async function submitQuestion() {
       body: JSON.stringify({ question: question, node_context: nodeContext, api_key: apiKey })
     });
 
+    if (!resp.ok) {
+      var errData = await resp.json();
+      answerText.textContent = errData.error || 'Server error (' + resp.status + ')';
+      return;
+    }
+
     var reader = resp.body.getReader();
     var decoder = new TextDecoder();
 
