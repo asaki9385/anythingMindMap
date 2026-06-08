@@ -1721,6 +1721,8 @@ function resetAndUpload() {
   }
 
   if (searchExpanded) toggleSearch();
+  closeAnnotationPanel();
+  _allNodeIds = [];
   document.getElementById('searchToggleBtn').style.display = 'none';
   document.getElementById('headerControls').style.display = 'none';
   document.getElementById('exportBtn').style.display = 'none';
@@ -2440,7 +2442,9 @@ document.addEventListener('keydown', function(e) {
     }
   }
   if (e.key === 'Escape') {
-    if (document.getElementById('infoPanel').classList.contains('show')) {
+    if (document.getElementById('annotationPanel').classList.contains('open')) {
+      closeAnnotationPanel();
+    } else if (document.getElementById('infoPanel').classList.contains('show')) {
       closePanel();
     } else if (searchExpanded) {
       toggleSearch();
@@ -2465,12 +2469,10 @@ document.getElementById('zoomRange').addEventListener('input', function(e) {
 
 // ── Annotation ──
 let _currentNodeId = null;
-let _currentNodeData = null;
 let _noteTimer = null;
 let _allNodeIds = [];
 
 function openAnnotationPanel(node, parentTitle) {
-  _currentNodeData = node;
   _currentNodeId = KT.getNodeId(node, parentTitle);
   const ann = AnnotationManager.get(_currentNodeId);
 
@@ -2487,7 +2489,6 @@ function openAnnotationPanel(node, parentTitle) {
 function closeAnnotationPanel() {
   document.getElementById('annotationPanel').classList.remove('open');
   _currentNodeId = null;
-  _currentNodeData = null;
 }
 
 function toggleStar() {
@@ -2508,9 +2509,10 @@ function setAnnotationStatus(value) {
 
 function saveAnnotationNote(text) {
   if (!_currentNodeId) return;
+  var nodeId = _currentNodeId;
   clearTimeout(_noteTimer);
   _noteTimer = setTimeout(function() {
-    AnnotationManager.setNote(_currentNodeId, text);
+    AnnotationManager.setNote(nodeId, text);
     refreshAnnotationVisuals();
   }, 600);
 }
