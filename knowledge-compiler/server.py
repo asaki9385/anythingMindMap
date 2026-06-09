@@ -869,6 +869,8 @@ async def api_upload(
     files: list[UploadFile] = File(...),
     mineru_token: str = Form(""),
     deepseek_api_key: str = Form(""),
+    api_base_url: str = Form(""),
+    model: str = Form(""),
 ):
     task_id = str(uuid.uuid4())[:8]
     task_label = files[0].filename if len(files) == 1 else f"{len(files)} 个文档"
@@ -877,6 +879,8 @@ async def api_upload(
         task_label,
         mineru_token=mineru_token.strip() or os.getenv("MINERU_API_KEY") or None,
         deepseek_api_key=deepseek_api_key.strip() or None,
+        api_base_url=api_base_url.strip() or None,
+        model=model.strip() or None,
     )
 
     # Save uploaded files
