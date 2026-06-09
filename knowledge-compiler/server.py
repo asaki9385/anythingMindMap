@@ -508,7 +508,7 @@ async def _llm_structure_chunks(units: list[dict], task: TaskProgress, api_key: 
     return trees
 
 
-def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict | None = None, api_key: str = '') -> list:
+def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict | None = None, api_key: str = '', api_base_url: str = '', model: str = '') -> list:
     """Build tree JSONs from markdown files using tree_builder logic."""
     from tree_builder import parse_md_to_nodes, adjust_standalone_levels, build_tree
     from hierarchy_repair import apply_hierarchy_repair
@@ -537,6 +537,8 @@ def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict 
                         nodes=nodes,
                         source_md=md_text,
                         api_key=api_key,
+                        api_base_url=api_base_url,
+                        model=model,
                     )
                 )
             except Exception as e:

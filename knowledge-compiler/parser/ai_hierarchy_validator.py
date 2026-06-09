@@ -24,6 +24,7 @@ async def ai_validate_with_source(
     source_md: str,
     api_key: str,
     model: str = MODEL,
+    api_base_url: str = '',
 ) -> list[dict]:
     """
     主入口。自适应粒度：根据内容体量决定发送策略。
@@ -37,12 +38,12 @@ async def ai_validate_with_source(
 
     try:
         if token_estimate < THRESHOLD_FULL:
-            nodes = await _validate_batch(nodes, source_md, api_key, model)
+            nodes = await _validate_batch(nodes, source_md, api_key, model, api_base_url)
         elif token_estimate < THRESHOLD_WINDOW:
             windowed_md = _build_windowed_source(nodes, source_md, window_chars=100)
-            nodes = await _validate_batch(nodes, windowed_md, api_key, model)
+            nodes = await _validate_batch(nodes, windowed_md, api_key, model, api_base_url)
         else:
-            nodes = await _validate_in_segments(nodes, source_md, api_key, model)
+            nodes = await _validate_in_segments(nodes, source_md, api_key, model, api_base_url)
     except Exception as e:
         print(f"  [ai_validate] 校验失败，跳过：{e}")
 
@@ -58,12 +59,14 @@ async def _validate_batch(
     source_md: str,
     api_key: str,
     model: str,
+    api_base_url: str = '',
 ) -> list[dict]:
     prompt = _build_prompt(nodes, source_md)
 
     async with httpx.AsyncClient() as client:
+        _url = api_base_url or DEEPSEEK_URL
         resp = await client.post(
-            DEEPSEEK_URL,
+            _url,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -99,11 +102,12 @@ async def _validate_in_segments(
     source_md: str,
     api_key: str,
     model: str,
+    api_base_url: str = '',
 ) -> list[dict]:
     segments = _split_by_h2(source_md)
     if len(segments) <= 1:
         windowed_md = _build_windowed_source(nodes, source_md, window_chars=100)
-        return await _validate_batch(nodes, windowed_md, api_key, model)
+        return await _validate_batch(nodes, windowed_md, api_key, model, api_base_url)
 
     seg_node_groups = _assign_nodes_to_segments(nodes, segments)
 
@@ -118,8 +122,9 @@ async def _validate_in_segments(
 
         try:
             async with httpx.AsyncClient() as client:
+                _url = api_base_url or DEEPSEEK_URL
                 resp = await client.post(
-                    DEEPSEEK_URL,
+                    _url,
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
