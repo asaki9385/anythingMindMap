@@ -1307,16 +1307,23 @@ body { overflow: hidden; }
         <a href="https://mineru.net" target="_blank" rel="noopener" class="config-link">Get a token from MinerU / OpenXLab ↗</a>
       </div>
       <div class="config-field">
-        <label for="deepseekKey">DeepSeek API Key</label>
+        <label for="deepseekKey">API Key</label>
         <input type="password" id="deepseekKey" placeholder="sk-...">
-        <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener" class="config-link">Get a key from DeepSeek Platform ↗</a>
+      </div>
+      <div class="config-field">
+        <label for="apiBaseUrl">API Base URL</label>
+        <input type="text" id="apiBaseUrl" placeholder="https://api.deepseek.com/chat/completions">
+      </div>
+      <div class="config-field">
+        <label for="apiModel">Model Name</label>
+        <input type="text" id="apiModel" placeholder="deepseek-v4-flash">
       </div>
       <div class="config-actions">
         <button class="primary" onclick="saveConfig()">Save Config</button>
       </div>
       <div class="config-degradation-note">
         <strong>Without MinerU token:</strong> All documents parsed locally by MarkItDown (no API needed).<br>
-        <strong>Without DeepSeek key:</strong> AI enhancement skipped.
+        <strong>Without API key:</strong> AI enhancement skipped.
       </div>
     </div>
   </div>
@@ -1496,6 +1503,8 @@ function loadSavedConfig() {
       var cfg = JSON.parse(raw);
       if (cfg.mineruToken) document.getElementById('mineruToken').value = cfg.mineruToken;
       if (cfg.deepseekKey) document.getElementById('deepseekKey').value = cfg.deepseekKey;
+      if (cfg.apiBaseUrl) document.getElementById('apiBaseUrl').value = cfg.apiBaseUrl;
+      if (cfg.apiModel) document.getElementById('apiModel').value = cfg.apiModel;
     }
   } catch (e) {}
 }
@@ -1503,7 +1512,9 @@ function loadSavedConfig() {
 function saveConfigToStorage() {
   var cfg = {
     mineruToken: document.getElementById('mineruToken').value.trim(),
-    deepseekKey: document.getElementById('deepseekKey').value.trim()
+    deepseekKey: document.getElementById('deepseekKey').value.trim(),
+    apiBaseUrl: document.getElementById('apiBaseUrl').value.trim(),
+    apiModel: document.getElementById('apiModel').value.trim()
   };
   if (cfg.mineruToken || cfg.deepseekKey) {
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
@@ -1623,6 +1634,8 @@ async function startProcessing() {
     var config = getConfig();
     if (config.mineruToken) formData.append('mineru_token', config.mineruToken);
     if (config.deepseekKey) formData.append('deepseek_api_key', config.deepseekKey);
+    if (config.apiBaseUrl) formData.append('api_base_url', config.apiBaseUrl);
+    if (config.apiModel) formData.append('model', config.apiModel);
 
     const uploadRes = await fetch(API_BASE + '/api/upload', {
       method: 'POST',
