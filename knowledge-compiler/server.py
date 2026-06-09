@@ -868,6 +868,33 @@ def _prepare_final_json(tree: dict) -> dict:
 # API Endpoints
 # ────────────────────────────────────────────
 
+@app.post("/api/test-api")
+async def api_test_api(
+    api_key: str = Form(""),
+    api_base_url: str = Form(""),
+    model: str = Form(""),
+):
+    url = api_base_url.strip() or os.environ.get("API_BASE_URL", "https://api.deepseek.com/chat/completions")
+    mdl = model.strip() or os.environ.get("API_MODEL", "deepseek-v4-flash")
+    key = api_key.strip()
+    if not key:
+        return {"ok": False, "error": "未提供 API Key"}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                url,
+                json={"model": mdl, "max_tokens": 10, "messages": [{"role": "user", "content": "hi"}]},
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            )
+            if resp.status_code == 200:
+                return {"ok": True}
+            else:
+                body = resp.text[:200]
+                return {"ok": False, "error": f"HTTP {resp.status_code}: {body}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/upload")
 async def api_upload(
     files: list[UploadFile] = File(...),

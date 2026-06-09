@@ -1529,9 +1529,38 @@ function getConfig() {
   return {};
 }
 
-function saveConfig() {
-  saveConfigToStorage();
-  KT.showToast('Configuration saved!');
+async function saveConfig() {
+  var key = document.getElementById('deepseekKey').value.trim();
+  if (!key) {
+    saveConfigToStorage();
+    KT.showToast('Configuration saved (no API key, AI features disabled)');
+    return;
+  }
+  var url = document.getElementById('apiBaseUrl').value.trim();
+  var model = document.getElementById('apiModel').value.trim();
+  var btn = document.querySelector('.config-actions .primary');
+  var origText = btn.textContent;
+  btn.textContent = 'Testing...';
+  btn.disabled = true;
+  try {
+    var fd = new FormData();
+    fd.append('api_key', key);
+    if (url) fd.append('api_base_url', url);
+    if (model) fd.append('model', model);
+    var res = await fetch(API_BASE + '/api/test-api', { method: 'POST', body: fd });
+    var data = await res.json();
+    if (data.ok) {
+      saveConfigToStorage();
+      KT.showToast('API verified & configuration saved!');
+    } else {
+      KT.showToast('API verification failed: ' + (data.error || 'unknown error'));
+    }
+  } catch (e) {
+    KT.showToast('Connection test failed: ' + e.message);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
 }
 
 function toggleSettings() {
