@@ -1529,38 +1529,9 @@ function getConfig() {
   return {};
 }
 
-async function saveConfig() {
-  var key = document.getElementById('deepseekKey').value.trim();
-  if (!key) {
-    saveConfigToStorage();
-    KT.showToast('Configuration saved (no API key, AI features disabled)');
-    return;
-  }
-  var url = document.getElementById('apiBaseUrl').value.trim();
-  var model = document.getElementById('apiModel').value.trim();
-  var btn = document.querySelector('.config-actions .primary');
-  var origText = btn.textContent;
-  btn.textContent = 'Testing...';
-  btn.disabled = true;
-  try {
-    var fd = new FormData();
-    fd.append('api_key', key);
-    if (url) fd.append('api_base_url', url);
-    if (model) fd.append('model', model);
-    var res = await fetch(API_BASE + '/api/test-api', { method: 'POST', body: fd });
-    var data = await res.json();
-    if (data.ok) {
-      saveConfigToStorage();
-      KT.showToast('API verified & configuration saved!');
-    } else {
-      KT.showToast('API verification failed: ' + (data.error || 'unknown error'));
-    }
-  } catch (e) {
-    KT.showToast('Connection test failed: ' + e.message);
-  } finally {
-    btn.textContent = origText;
-    btn.disabled = false;
-  }
+function saveConfig() {
+  saveConfigToStorage();
+  KT.showToast('Configuration saved!');
 }
 
 function toggleSettings() {
@@ -1574,11 +1545,12 @@ var fileInput = document.getElementById('fileInput');
 var fileListEl = document.getElementById('fileList');
 var startBtn = document.getElementById('startBtn');
 
-const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
+const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.md'];
 function isAcceptedFile(file) {
   if (file.type === 'application/pdf') return true;
   if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return true;
   if (file.type === 'text/plain') return true;
+  if (file.type === 'text/markdown' || file.type === 'text/x-markdown') return true;
   const ext = '.' + file.name.split('.').pop().toLowerCase();
   return ACCEPTED_EXTENSIONS.includes(ext);
 }
