@@ -224,7 +224,7 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
         unstructured_units = [u for u in all_units if u.get('split_mode') in ('text',) and not u.get('has_structure')]
         if unstructured_units:
             if not deepseek_api_key:
-                task.messages.append("未提供DeepSeek API Key，跳过AI结构化，使用基础标题解析")
+                task.messages.append("未提供API Key，跳过AI结构化，使用基础标题解析")
                 llm_trees = []
             else:
                 task.set_stage("building_tree", 42, f"正在用AI分析 {len(unstructured_units)} 个无结构文本文档...")
@@ -262,7 +262,7 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
 
         # ── Stage 5: AI Enhancement ──
         if not deepseek_api_key:
-            task.set_stage("ai_enhancing", 95, "未提供DeepSeek API Key，跳过AI增强")
+            task.set_stage("ai_enhancing", 95, "未提供API Key，跳过AI增强")
             from node_enhancer import cleanup_tree_structure
             merged_tree = cleanup_tree_structure(merged_tree)
             enhanced_tree = merged_tree

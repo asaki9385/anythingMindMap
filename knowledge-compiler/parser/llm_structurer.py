@@ -89,7 +89,7 @@ async def structure_text_chunk(client: httpx.AsyncClient, chunk: dict,
     if api_key is None:
         api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
-        raise ValueError("DeepSeek API key is required. Set OPENAI_API_KEY env var or pass the api_key parameter.")
+        raise ValueError("API key is required. Set OPENAI_API_KEY env var or pass the api_key parameter.")
     prompt = build_structure_prompt(chunk["text"], chunk, prev_tail_context)
     _model = model or MODEL
     _url = api_base_url or OPENAI_BASE_URL
