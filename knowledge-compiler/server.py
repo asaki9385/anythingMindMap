@@ -459,7 +459,7 @@ def _prepare_text_units(uploaded_files: list[dict], work_dir: str, task: TaskPro
     return units
 
 
-async def _llm_structure_chunks(units: list[dict], task: TaskProgress, api_key: str) -> list[dict]:
+async def _llm_structure_chunks(units: list[dict], task: TaskProgress, api_key: str, api_base_url: str = '', model: str = '') -> list[dict]:
     """Use LLM to create tree structure from unstructured text chunks."""
     from parser.text_extractor import split_large_text
 
@@ -482,7 +482,7 @@ async def _llm_structure_chunks(units: list[dict], task: TaskProgress, api_key: 
 
         # Process chunks sequentially with context bridging
         try:
-            chunk_trees = await structure_all_chunks(chunk_list, api_key=api_key)
+            chunk_trees = await structure_all_chunks(chunk_list, api_key=api_key, api_base_url=api_base_url, model=model)
             if chunk_trees:
                 # Merge multiple chunk trees into one
                 if len(chunk_trees) == 1:

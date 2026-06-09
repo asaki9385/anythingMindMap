@@ -83,15 +83,18 @@ def build_structure_prompt(chunk_text: str, chunk_meta: dict, prev_tail_context:
 
 
 async def structure_text_chunk(client: httpx.AsyncClient, chunk: dict,
-                                prev_tail_context: str = "", api_key: str | None = None) -> tuple[dict, str]:
+                                prev_tail_context: str = "", api_key: str | None = None,
+                                api_base_url: str = '', model: str = '') -> tuple[dict, str]:
     """Call LLM to structure one text chunk. Returns (tree_dict, tail_context)."""
     if api_key is None:
         api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         raise ValueError("DeepSeek API key is required. Set OPENAI_API_KEY env var or pass the api_key parameter.")
     prompt = build_structure_prompt(chunk["text"], chunk, prev_tail_context)
+    _model = model or MODEL
+    _url = api_base_url or OPENAI_BASE_URL
     payload = {
-        "model": MODEL,
+        "model": _model,
         "max_tokens": 2000,
         "temperature": 0.3,
         "response_format": {"type": "json_object"},
@@ -99,7 +102,7 @@ async def structure_text_chunk(client: httpx.AsyncClient, chunk: dict,
     }
 
     resp = await client.post(
-        OPENAI_BASE_URL,
+        _url,
         json=payload,
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -155,7 +158,7 @@ def _extract_tail_context(tree: dict) -> str:
     return "\n".join(lines)
 
 
-async def structure_all_chunks(chunks: list[dict], api_key: str | None = None) -> list[dict]:
+async def structure_all_chunks(chunks: list[dict], api_key: str | None = None, api_base_url: str = '', model: str = '') -> list[dict]:
     """Sequentially process chunks with context bridging.
 
     Each chunk's output includes the tree + a summary that feeds into the next chunk.
@@ -169,6 +172,7 @@ async def structure_all_chunks(chunks: list[dict], api_key: str | None = None) -
             try:
                 tree, tail_context = await structure_text_chunk(
                     client, chunk, prev_tail_context, api_key=api_key,
+                    api_base_url=api_base_url, model=model,
                 )
                 trees.append(tree)
                 prev_tail_context = tail_context
