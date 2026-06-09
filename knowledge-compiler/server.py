@@ -86,6 +86,14 @@ async def root():
 # Task management
 # ────────────────────────────────────────────
 
+def _normalize_api_url(url: str) -> str:
+    """Ensure the API URL ends with /chat/completions."""
+    url = url.rstrip("/")
+    if not url.endswith("/chat/completions"):
+        url = url + "/chat/completions"
+    return url
+
+
 class TaskProgress:
     def __init__(self, task_id: str, filename: str,
                  mineru_token: str | None = None,
@@ -104,7 +112,7 @@ class TaskProgress:
         self.messages = []
         self.mineru_token = mineru_token
         self.deepseek_api_key = deepseek_api_key
-        self.api_base_url = api_base_url or os.environ.get("API_BASE_URL", "https://api.deepseek.com/chat/completions")
+        self.api_base_url = _normalize_api_url(api_base_url) if api_base_url else os.environ.get("API_BASE_URL", "https://api.deepseek.com/chat/completions")
         self.model = model or os.environ.get("API_MODEL", "deepseek-v4-flash")
         self._event = threading.Event()
 
@@ -874,7 +882,7 @@ async def api_test_api(
     api_base_url: str = Form(""),
     model: str = Form(""),
 ):
-    url = api_base_url.strip() or os.environ.get("API_BASE_URL", "https://api.deepseek.com/chat/completions")
+    url = _normalize_api_url(api_base_url.strip()) if api_base_url.strip() else os.environ.get("API_BASE_URL", "https://api.deepseek.com/chat/completions")
     mdl = model.strip() or os.environ.get("API_MODEL", "deepseek-v4-flash")
     key = api_key.strip()
     if not key:
