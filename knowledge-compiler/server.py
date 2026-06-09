@@ -89,7 +89,9 @@ async def root():
 class TaskProgress:
     def __init__(self, task_id: str, filename: str,
                  mineru_token: str | None = None,
-                 deepseek_api_key: str | None = None):
+                 deepseek_api_key: str | None = None,
+                 api_base_url: str | None = None,
+                 model: str | None = None):
         self.task_id = task_id
         self.filename = filename
         self.stage = "uploading"
@@ -102,6 +104,8 @@ class TaskProgress:
         self.messages = []
         self.mineru_token = mineru_token
         self.deepseek_api_key = deepseek_api_key
+        self.api_base_url = api_base_url or os.environ.get("API_BASE_URL", "https://api.deepseek.com/chat/completions")
+        self.model = model or os.environ.get("API_MODEL", "deepseek-v4-flash")
         self._event = threading.Event()
 
     def set_stage(self, stage: str, progress: float = None, message: str = ""):
