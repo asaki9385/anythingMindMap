@@ -155,6 +155,8 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
 
     mineru_token = task.mineru_token
     deepseek_api_key = task.deepseek_api_key
+    api_base_url = task.api_base_url
+    model = task.model
 
     try:
         # ── Separate files by type ──
@@ -227,7 +229,7 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
             else:
                 task.set_stage("building_tree", 42, f"正在用AI分析 {len(unstructured_units)} 个无结构文本文档...")
                 try:
-                    llm_trees = asyncio.run(_llm_structure_chunks(unstructured_units, task, deepseek_api_key))
+                    llm_trees = asyncio.run(_llm_structure_chunks(unstructured_units, task, deepseek_api_key, api_base_url, model))
                 except Exception as e:
                     task.messages.append(f"WARNING: LLM结构化失败 ({e})，使用基础解析")
                     llm_trees = []
@@ -238,7 +240,7 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
         task.set_stage("building_tree", 45, "正在构建知识树...")
         # All units (PDF + structured text) for metadata
         unit_meta_by_stem = {Path(unit["path"]).stem: unit for unit in all_units}
-        tree_files = _build_trees_from_md(md_files, work_dir, unit_meta_by_stem, api_key=deepseek_api_key)
+        tree_files = _build_trees_from_md(md_files, work_dir, unit_meta_by_stem, api_key=deepseek_api_key, api_base_url=api_base_url, model=model)
 
         # Add LLM-structured trees (from unstructured text)
         for i, tree in enumerate(llm_trees):
@@ -267,7 +269,7 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
         else:
             task.set_stage("ai_enhancing", 80, "正在AI增强节点(添加摘要/关键词/考点)...")
             try:
-                enhanced_tree = asyncio.run(_enhance_tree(merged_tree, task, deepseek_api_key))
+                enhanced_tree = asyncio.run(_enhance_tree(merged_tree, task, deepseek_api_key, api_base_url, model))
                 task.set_stage("ai_enhancing", 95, "AI增强完成")
             except Exception as e:
                 task.set_stage("ai_enhancing", 95, f"AI增强跳过 ({e})，使用未经增强的树")
