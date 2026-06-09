@@ -703,7 +703,7 @@ def _fix_hierarchy_and_merge(tree_files: list, work_dir: str) -> dict:
     return {"title": "Knowledge Tree", "children": root_children}
 
 
-async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str) -> dict:
+async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str, api_base_url: str = '', model: str = '') -> dict:
     """Enhance tree nodes with AI summaries, keywords, and exam points.
     Reports progress to task object and limits scope for responsiveness.
     Now includes adaptive profile detection and structural cleanup."""
@@ -745,13 +745,13 @@ async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str) -> dict:
     async with httpx.AsyncClient(timeout=API_TIMEOUT) as client:
         try:
             test_payload = {
-                "model": MODEL,
+                "model": model or MODEL,
                 "max_tokens": 20,
                 "temperature": 0,
                 "messages": [{"role": "user", "content": "回复OK"}]
             }
             resp = await client.post(
-                OPENAI_BASE_URL,
+                api_base_url or OPENAI_BASE_URL,
                 json=test_payload,
                 headers={
                     "Authorization": f"Bearer {api_key}",
@@ -777,7 +777,7 @@ async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str) -> dict:
             ancestor_path = get_ancestor_path(tree, node)
             prompt = build_prompt(node, SUBJECT_CONFIG, get_context_text(node), "", document_profile, ancestor_path=ancestor_path)
             payload = {
-                "model": MODEL,
+                "model": model or MODEL,
                 "max_tokens": 1000,
                 "temperature": 0.3,
                 "response_format": {"type": "json_object"},
@@ -785,7 +785,7 @@ async def _enhance_tree(tree: dict, task: TaskProgress, api_key: str) -> dict:
             }
             try:
                 resp = await client.post(
-                    OPENAI_BASE_URL,
+                    api_base_url or OPENAI_BASE_URL,
                     json=payload,
                     headers={
                         "Authorization": f"Bearer {api_key}",
