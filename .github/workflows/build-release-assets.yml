@@ -81,5 +81,7 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME}"
           gh release view "$tag" >/dev/null 2>&1 || \
-            gh release create "$tag" --title "AnythingMindmap $tag" --generate-notes
-          gh release upload "$tag" dist/* --clobber
+            gh release create "$tag" --title "AnythingMindmap $tag" --generate-notes || true
+          shopt -s nullglob
+          assets=(dist/AnythingMindmap-source-*.zip dist/AnythingMindmap-macos-*.dmg)
+          gh release upload "$tag" "${assets[@]}" --clobber

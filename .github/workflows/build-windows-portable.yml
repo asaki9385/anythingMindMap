@@ -56,5 +56,8 @@ jobs:
           gh release view $tag 2>$null
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag --generate-notes 2>$null
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Release may have been created by another workflow; continuing."
+            }
           }
           gh release upload $tag "dist/AnythingMindmap-windows-x64.zip" --clobber
