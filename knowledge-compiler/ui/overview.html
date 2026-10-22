@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script src="embed-mode.js?v=1"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>资料导览 · AnythingMindmap</title>
+<link rel="stylesheet" href="cds-theme.css?v=1">
+<link rel="stylesheet" href="theme.css?v=3">
+<link rel="stylesheet" href="client-embed.css?v=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<style>
+body { overflow-y: auto; }
+.page { max-width: 1060px; margin: 0 auto; padding: 0 22px 90px; }
+
+/* ── Topbar ── */
+.topbar {
+  position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 22px; background: var(--surface-overlay); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar h1 { font-family: var(--font-serif); font-size: 16px; font-weight: 700; white-space: nowrap; }
+.topbar h1 a { text-decoration: none; color: inherit; }
+.topbar .tb-right { display: flex; gap: 10px; align-items: center; }
+.btn {
+  padding: 7px 15px; border-radius: var(--radius-full); cursor: pointer; font-size: 13px;
+  background: var(--surface-raised); color: var(--ink-secondary); border: 1px solid var(--border);
+  transition: all .2s; white-space: nowrap; text-decoration: none; display: inline-block;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent-hover); background: var(--tag-accent-bg); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-hover); color: #fff; }
+.btn.sm { padding: 4px 12px; font-size: 12px; }
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+  background: var(--surface-raised); border: 1px solid var(--border);
+  border-radius: var(--radius-full); cursor: pointer; font-size: 12px; color: var(--ink-secondary);
+}
+
+/* ── Hero ── */
+.hero { padding: 34px 0 8px; }
+.hero-kicker {
+  font-size: var(--text-xs); letter-spacing: 2px; text-transform: uppercase;
+  color: var(--accent); font-weight: var(--weight-semibold); margin-bottom: 6px;
+}
+.hero-title {
+  font-family: var(--font-serif); font-size: 32px; font-weight: var(--weight-bold);
+  color: var(--ink); line-height: 1.25;
+}
+.hero-guide {
+  margin-top: 12px; font-size: var(--text-md); color: var(--ink-secondary);
+  line-height: var(--leading-relaxed); max-width: 760px;
+}
+.hero-guide p { margin: 5px 0; }
+
+.stats-row { display: flex; gap: var(--sp-4); margin-top: var(--sp-6); flex-wrap: wrap; }
+.stat {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--sp-3) var(--sp-5); min-width: 104px;
+}
+.stat .num { font-family: var(--font-serif); font-size: var(--text-2xl); font-weight: var(--weight-bold); color: var(--accent); }
+.stat .lbl { font-size: var(--text-xs); color: var(--ink-muted); }
+.stat.accent-green .num { color: var(--success); }
+.stat.accent-warn .num { color: var(--danger); }
+
+/* ── Section ── */
+.section { margin-top: var(--sp-10); }
+.section-h {
+  font-family: var(--font-serif); font-size: var(--text-xl); font-weight: var(--weight-bold);
+  color: var(--ink); display: flex; align-items: baseline; gap: var(--sp-3); margin-bottom: var(--sp-4);
+}
+.section-h .hint { font-size: var(--text-xs); color: var(--ink-muted); font-weight: var(--weight-regular); }
+
+/* ── 学习路径 ── */
+.path-wrap {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+}
+.path-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 8px 12px;
+}
+.path-item {
+  appearance: none; display: grid; grid-template-columns: 24px minmax(0, 1fr) 18px;
+  align-items: start; gap: 10px; width: 100%; padding: 10px 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: var(--canvas); cursor: pointer; font: inherit;
+  font-size: 13px; line-height: 1.55; color: var(--ink-secondary); text-align: left;
+  transition: border-color .15s, background .15s, color .15s; min-width: 0;
+}
+.path-title { min-width: 0; overflow-wrap: anywhere; }
+.path-item:hover,
+.path-item:focus-visible { border-color: var(--border-accent); background: var(--tag-accent-bg); color: var(--ink); outline: none; }
+.path-enter {
+  display: inline-flex; align-items: center; justify-content: center; align-self: center;
+  color: var(--accent); opacity: 0; transform: translateX(-3px); transition: opacity .15s, transform .15s;
+}
+.path-item:hover .path-enter,
+.path-item:focus-visible .path-enter { opacity: 1; transform: translateX(0); }
+.path-num {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--tag-accent-bg); color: var(--accent);
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  margin-top: 1px;
+}
+.path-list.is-reading {
+  position: relative; display: flex; flex-direction: column; gap: 0;
+}
+.path-list.is-reading::before {
+  content: ''; position: absolute; left: 11px; top: 23px; bottom: 23px; width: 1px;
+  background: var(--border-strong);
+}
+.path-list.is-reading .path-item {
+  position: relative; grid-template-columns: minmax(0, 1fr) 18px;
+  margin-left: 28px; width: calc(100% - 28px); padding: 11px 10px;
+  border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
+  background: transparent; box-sizing: border-box;
+}
+.path-list.is-reading .path-item:last-child { border-bottom: 0; }
+.path-list.is-reading .path-item:hover,
+.path-list.is-reading .path-item:focus-visible {
+  background: var(--tag-accent-bg); border-radius: var(--radius-md);
+}
+.path-list.is-reading .path-num {
+  position: absolute; left: -29px; top: 50%; width: 23px; height: 23px; margin-top: 0;
+  transform: translateY(-50%); background: var(--surface);
+  box-shadow: 0 0 0 4px var(--surface), 0 0 0 5px var(--border);
+}
+.path-list.is-reading .path-enter { opacity: 1; transform: none; }
+@media (max-width: 780px) {
+  .path-list { grid-template-columns: 1fr; }
+  .path-list.is-reading .path-item { width: calc(100% - 22px); margin-left: 22px; }
+  .path-list.is-reading::before { left: 11px; }
+  .path-list.is-reading .path-num { left: -24px; }
+}
+
+/* ── 章节卡片 ── */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--sp-4); }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--sp-5); position: relative; display: flex; flex-direction: column;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.card:hover { border-color: var(--border-accent); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.card .order-badge {
+  position: absolute; top: var(--sp-4); right: var(--sp-4);
+  width: 26px; height: 26px; border-radius: 50%; background: var(--tag-accent-bg); color: var(--accent);
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.card .card-title {
+  font-family: var(--font-serif); font-size: var(--text-md); font-weight: var(--weight-bold);
+  color: var(--ink); line-height: var(--leading-tight); padding-right: 36px; margin-bottom: 6px; cursor: pointer;
+}
+.card .card-title:hover { color: var(--accent-hover); }
+.card .card-guide {
+  font-size: var(--text-sm); color: var(--ink-secondary); line-height: var(--leading-normal);
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card .card-guide.fallback-note { color: var(--ink-muted); font-style: italic; }
+.card .card-kws { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.card .kw {
+  background: var(--keyword-bg); color: var(--keyword-color); padding: 1px 9px;
+  border-radius: var(--radius-full); font-size: 11px;
+}
+.card .card-meta {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 11.5px; color: var(--ink-muted);
+}
+.card .card-meta b { color: var(--ink-secondary); }
+.card .card-meta .exam-flag { color: var(--success); }
+.card .card-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border-strong); }
+.card .card-actions .btn { flex: 1; text-align: center; }
+
+/* ── 进度 ── */
+.prog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-4); }
+.prog-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--sp-4) var(--sp-5);
+}
+.prog-box .pn { font-family: var(--font-serif); font-size: var(--text-xl); font-weight: var(--weight-bold); color: var(--ink); }
+.prog-box .pl { font-size: var(--text-xs); color: var(--ink-muted); }
+.prog-box .pd { font-size: 11.5px; color: var(--ink-secondary); margin-top: 6px; line-height: 1.5; }
+.prog-empty {
+  background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
+  padding: var(--sp-5); font-size: 13px; color: var(--ink-secondary); line-height: 1.7;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+
+.loading-wrap { padding: 80px 0; text-align: center; color: var(--ink-muted); font-size: 14px; }
+.error-wrap { padding: 60px 0; color: var(--danger); font-size: 14px; line-height: 1.8; }
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff; padding: 10px 22px; border-radius: var(--radius-full);
+  font-size: 13px; z-index: 2000; display: none; box-shadow: var(--shadow-lg); max-width: 70vw;
+}
+.toast.show { display: block; animation: toastInOut 2.6s forwards; }
+@keyframes toastInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Embedded in the client shell: remove duplicate page chrome ── */
+html[data-embed="1"] .topbar { display: none !important; }
+html[data-embed="1"] body { background: var(--canvas); }
+html[data-embed="1"] .page { max-width: 1100px; padding: 20px 26px 70px; }
+/* 嵌入式容器由 client 提供唯一的视图切换器，避免页面切换时按钮跳动。 */
+html[data-embed="1"] .overview-switchbar .hub-rail { display: none !important; }
+
+</style>
+<link rel="stylesheet" href="claude-pages.css?v=2">
+</head>
+<body>
+<div class="topbar">
+  <h1><a href="/ui/client.html#home"><span class="legacy-brand-mark" data-icon="tree"></span><span>AnythingMindmap · <span style="color:var(--accent)">资料导览</span></span></a></h1>
+  <div class="tb-right">
+    <a class="btn" id="browseLink" href="/ui/client.html#library">资料库</a>
+    <a class="btn primary" id="mapLink" href="#">打开导图</a>
+    <a class="btn" href="/ui/settings.html">设置</a>
+    <div class="theme-toggle" onclick="toggleThemeUI()"><span id="themeIcon"></span><span id="themeLabel">深色</span></div>
+  </div>
+</div>
+
+<div class="overview-switchbar">
+  <div class="overview-switchbar-inner">
+    <div class="hub-rail" role="tablist" aria-label="资料视图">
+      <button class="hub-rail-item is-active" type="button" role="tab" aria-selected="true"><span data-icon="menu"></span>导览</button>
+      <button class="hub-rail-item" id="overviewToCanvasBtn" type="button" role="tab" aria-selected="false" onclick="switchToCanvas()"><span data-icon="tree"></span>导图</button>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page">
+  <div class="loading-wrap" id="loading">正在加载资料…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="common.js?v=7"></script>
+<script src="review_widget.js?v=29"></script>
+<script>
+'use strict';
+window.KT = window.KT || {};
+KT.iconHtml = KT.iconHtml || function () { return ""; };
+KT.applyIconSlots = KT.applyIconSlots || function () {};
+KT.initTheme();
+
+var treeData = null;
+var fileKey = '';
+
+function $(id) { return document.getElementById(id); }
+function syncThemeUI() {
+  // 图标与文案统一交给公共库（旧版 common.js 时保持安静降级，让版本自检提示正常出现）
+  if (window.KT && typeof KT.updateThemeUI === 'function') KT.updateThemeUI();
+}
+function toggleThemeUI() { KT.toggleTheme(); syncThemeUI(); }
+function toast(m) { KT.showToast(m); }
+function enc(s) { return encodeURIComponent(s); }
+
+// ── 数据加载（与导图页同一套 ?file= / ?task= 约定） ──
+async function loadTree() {
+  var params = new URLSearchParams(location.search);
+  var fileParam = params.get('file');
+  var taskParam = params.get('task');
+  if (taskParam) {
+    var r1 = await fetch('/api/result/' + enc(taskParam));
+    if (!r1.ok) throw new Error('无法加载任务 ' + taskParam + '（' + r1.status + '）');
+    fileKey = 'task_' + taskParam;
+    return KT.transformNode(await r1.json(), 1);
+  }
+  if (fileParam) {
+    var r2 = await fetch('/api/file/' + enc(fileParam));
+    if (!r2.ok) throw new Error('无法加载资料 ' + fileParam + '（' + r2.status + '）');
+    fileKey = fileParam;
+    return KT.transformNode(await r2.json(), 1);
+  }
+  throw new Error('缺少 file 或 task 参数。请从「资料库」进入。');
+}
+
+function bookTitle() {
+  if (!treeData) return 'AnythingMindmap';
+  if (treeData.title && treeData.title !== 'AnythingMindmap' && treeData.title !== 'Knowledge Tree') return treeData.title;
+  if (treeData.children && treeData.children.length === 1) {
+    return treeData.children[0].title || treeData.children[0].name || treeData.title;
+  }
+  return treeData.title || treeData.name || 'AnythingMindmap';
+}
+
+function isEmbedded() { return document.documentElement.getAttribute('data-embed') === '1'; }
+function mapUrl(chapter) {
+  var u = '/ui/tree_mindmap.html?file=' + enc(fileKey);
+  if (chapter) u += '&chapter=' + enc(chapter);
+  if (isEmbedded()) u += '&embed=1';
+  return u;
+}
+
+// ── 渲染 ──
+async function render() {
+  var modules = KT.bookModules(treeData);
+  var order = KT.computeStudyOrder(modules);
+  var rankOf = {};
+  order.forEach(function (mi, rank) { rankOf[mi] = rank + 1; });
+  var total = KT.moduleStats(treeData);
+
+  $('mapLink').href = mapUrl('');
+  document.title = bookTitle() + ' · 资料导览';
+
+  var html = '';
+
+  // Hero
+  html += '<div class="hero">';
+  html += '<div class="hero-kicker">全书导览</div>';
+  html += '<div class="hero-title">' + KT.escapeHtml(bookTitle()) + '</div>';
+  var guide = treeData.guide || '';
+  if (guide) {
+    html += '<div class="hero-guide">' + guide.split(/\n+/).filter(function (p) { return p.trim(); })
+      .map(function (p) { return '<p>' + KT.escapeHtml(p.trim()) + '</p>'; }).join('') + '</div>';
+  } else {
+    html += '<div class="hero-guide"><p>这份资料已整理为 ' + modules.length
+      + ' 个模块。建议按下方推荐顺序逐块学习；进入导图后用章节侧栏定位，点开带考点标记的节点快速回顾。</p></div>';
+  }
+  html += '<div class="stats-row">'
+    + stat(modules.length, '模块') + stat(total.nodes, '知识点')
+    + stat(total.examCount, '考点标注', 'accent-green') + stat(total.enhanced, 'AI 摘要')
+    + '</div></div>';
+
+  // 复习进度
+  var prog = null;
+  try { prog = await (await fetch('/api/review/progress?file=' + enc(fileKey))).json(); } catch (e) {}
+  html += '<div class="section"><div class="section-h">复习进度 <span class="hint">二轮复习 · 提问式引导</span></div>';
+  if (prog && (prog.unit_count || prog.retest.length || prog.weak.length)) {
+    var last = (prog.sessions || []).slice(-1)[0];
+    var dueCount = prog.due_count || 0;
+    html += '<div class="prog-grid">'
+      + progBox(prog.unit_count, '已练考点', last ? '上次：过关 ' + last.passed + ' · 半过关 ' + last.half + ' · 未过关 ' + last.failed : '')
+      + progBox(prog.retest.length, '待复测', dueCount
+          ? ('今日到期 ' + dueCount + ' 个')
+          : (prog.retest.slice(0, 2).map(function (x) { return KT.escapeHtml(x.title); }).join('、') || ''))
+      + progBox(prog.weak.length, '薄弱点', (prog.weak.slice(0, 2).map(function (x) { return KT.escapeHtml(x.title); }).join('、') || ''))
+      + '</div>';
+    html += '<div style="margin-top:12px;">'
+      + (dueCount > 0
+          ? '<button class="btn primary" onclick="startReview(\'\', \'retest\')">开始今日复练（' + dueCount + ' 个到期）</button>'
+          : '<button class="btn primary" onclick="startReview(\'\')">继续对话复习</button>')
+      + '</div>';
+  } else {
+    html += '<div class="prog-empty"><span>还没有复习记录。点击右侧开始——AI 会先出题，你只负责回答。</span>'
+      + '<button class="btn primary" onclick="startReview(\'\')">开始对话复习</button></div>';
+  }
+  html += '</div>';
+
+  // 学习路径：不再把长标题压缩进固定宽度的 Mermaid 图。
+  // 短路径用卡片网格；章节多或标题长时切换为纵向阅读轨道，字号始终可读。
+  var pathLayout = studyPathLayout(modules);
+  var pathHint = pathLayout === 'reading'
+    ? '章节较多 · 按推荐顺序纵向阅读，点击直达导图'
+    : '按推荐顺序学习，点击直达该章导图';
+  html += '<div class="section"><div class="section-h">学习路径 <span class="hint">' + pathHint + '</span></div>';
+  html += '<div class="path-wrap"><div class="path-list'
+    + (pathLayout === 'reading' ? ' is-reading' : '') + '">';
+  order.forEach(function (mi, rank) {
+    var t = modules[mi].title || modules[mi].name;
+    var jt = JSON.stringify(t).replace(/"/g, '&quot;');
+    var titleAttr = KT.escapeHtml(t).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    html += '<button type="button" class="path-item" onclick="openMap(' + jt + ')"'
+      + ' title="打开「' + titleAttr + '」导图">'
+      + '<span class="path-num">' + (rank + 1) + '</span>'
+      + '<span class="path-title">' + KT.escapeHtml(t) + '</span>'
+      + '<span class="path-enter" aria-hidden="true">' + KT.iconHtml('arrowRight') + '</span>'
+      + '</button>';
+  });
+  html += '</div></div></div>';
+
+  // 章节卡片
+  html += '<div class="section"><div class="section-h">模块目录 <span class="hint">'
+    + modules.length + ' 个模块 · 导学 + 考点一览</span></div><div class="cards">';
+  modules.forEach(function (m, i) {
+    var st = KT.moduleStats(m);
+    var title = m.title || m.name;
+    var jt = JSON.stringify(title).replace(/"/g, '&quot;');
+    var desc = (m.guide && m.guide.trim())
+      ? m.guide.split(/\n+/).filter(function (p) { return p.trim(); })[0]
+      : (m.summary || '');
+    html += '<div class="card">';
+    html += '<div class="order-badge" title="推荐学习顺序">' + rankOf[i] + '</div>';
+    html += '<div class="card-title" onclick="openMap(' + jt + ')">' + KT.escapeHtml(title) + '</div>';
+    html += desc
+      ? '<div class="card-guide">' + KT.escapeHtml(desc) + '</div>'
+      : '<div class="card-guide fallback-note">（暂无导学，可在重新处理时生成）</div>';
+    if (m.keywords && m.keywords.length) {
+      html += '<div class="card-kws">' + m.keywords.slice(0, 4).map(function (k) {
+        var t = (typeof k === 'object' && k && k.term) ? k.term : k;
+        return '<span class="kw">' + KT.escapeHtml(String(t)) + '</span>';
+      }).join('') + '</div>';
+    }
+    html += '<div class="card-meta">'
+      + '<span><b>' + st.nodes + '</b> 知识点</span>'
+      + (st.examCount ? '<span class="exam-flag">' + KT.iconHtml('target') + ' ' + st.examCount + ' 考点</span>' : '<span>无考点标注</span>')
+      + (st.fallback ? '<span title="部分内容由离线兜底生成">' + KT.iconHtml('alert') + ' ' + st.fallback + '</span>' : '')
+      + '</div>';
+    html += '<div class="card-actions">'
+      + '<button class="btn sm" onclick="openMap(' + jt + ')">打开导图</button>'
+      + '<button class="btn sm" onclick="startReview(' + jt + ')">对话复习</button>'
+      + '</div></div>';
+  });
+  html += '</div></div>';
+
+  $('page').innerHTML = html;
+  KT.postRenderMathAndMermaid($('page'));
+  animateIntro();
+  if (!isEmbedded()) ReviewWidget.mount({ file: fileKey, chapter: '' });
+}
+
+// 整页入场编排：导言 → 统计 → 各分区 → 模块卡片，逐段浮现
+// （无 GSAP / 减动效偏好时内容本来就是静态可见的，直接跳过）
+function animateIntro() {
+  if (!window.KT || !KT.gsapReady()) return;
+  var page = $('page');
+  var clear = 'opacity,visibility,transform';
+  var tl = gsap.timeline();
+  var heroBits = page.querySelectorAll('.hero > *');
+  if (heroBits.length) {
+    tl.from(heroBits, { autoAlpha: 0, y: 12, duration: 0.32, stagger: 0.06,
+      ease: 'power2.out', clearProps: clear });
+  }
+  var stats = page.querySelectorAll('.stats-row .stat');
+  if (stats.length) {
+    tl.from(stats, { autoAlpha: 0, y: 10, duration: 0.28, stagger: 0.05,
+      ease: 'power2.out', clearProps: clear }, '-=0.12');
+  }
+  var secs = page.querySelectorAll('.section');
+  if (secs.length) {
+    tl.from(secs, { autoAlpha: 0, y: 14, duration: 0.3, stagger: 0.08,
+      ease: 'power2.out', clearProps: clear }, '-=0.1');
+  }
+  var cards = page.querySelectorAll('.cards .card');
+  if (cards.length) {
+    tl.from(cards, { autoAlpha: 0, y: 10, duration: 0.26, stagger: 0.04,
+      ease: 'power2.out', clearProps: clear }, '-=0.18');
+  }
+}
+
+
+// 学习路径布局：短标题用网格；数量多或单条标题过长时改为纵向轨道。
+function studyPathLayout(modules) {
+  if (!modules || !modules.length) return 'grid';
+  var maxTitleChars = 0;
+  var totalTitleChars = 0;
+  modules.forEach(function (m) {
+    var n = String((m && (m.title || m.name)) || '').length;
+    maxTitleChars = Math.max(maxTitleChars, n);
+    totalTitleChars += n;
+  });
+  return modules.length > 8 || maxTitleChars > 26 || totalTitleChars > 150
+    ? 'reading' : 'grid';
+}
+
+function stat(num, label, cls) {
+  return '<div class="stat' + (cls ? ' ' + cls : '') + '"><div class="num">' + num
+    + '</div><div class="lbl">' + label + '</div></div>';
+}
+function progBox(num, label, detail) {
+  return '<div class="prog-box"><div class="pn">' + num + '</div><div class="pl">' + label + '</div>'
+    + (detail ? '<div class="pd">' + detail + '</div>' : '') + '</div>';
+}
+
+// ── 动作 ──
+function switchToCanvas() {
+  if (!fileKey) { toast('请先从资料库选择一份资料'); return; }
+  if (isEmbedded()) {
+    parent.postMessage({ type: 'kt-preview-mode', mode: 'canvas' }, location.origin);
+    return;
+  }
+  window.location.href = mapUrl('');
+}
+
+function openMap(chapter) {
+  if (isEmbedded()) {
+    parent.postMessage({ type: 'kt-open-resource', file: fileKey, mode: 'canvas', chapter: chapter || '' }, location.origin);
+    return;
+  }
+  window.open(mapUrl(chapter), '_blank');
+}
+function startReview(chapter, scope) {
+  if (isEmbedded()) {
+    parent.postMessage({ type: 'kt-open-chat', file: fileKey, chapter: chapter || '', scope: scope || 'all' }, location.origin);
+    return;
+  }
+  ReviewWidget.startChapter(chapter || '', scope || 'all');
+}
+
+syncThemeUI();
+
+// 资源混版自检：HTML 是新的、common.js 还是浏览器缓存的旧版时，
+// 会以「KT.xxx is not a function」这种看不懂的方式炸掉，这里提前给出可操作提示。
+(function boot() {
+  if (!window.KT || typeof KT.bookModules !== 'function' || !KT.Panels || typeof KT.iconHtml !== 'function') {
+    fail(new Error('界面资源版本不一致（common.js 是浏览器缓存的旧版本）'));
+    return;
+  }
+  loadTree().then(function (tree) {
+    treeData = tree;
+    return render();
+  }).catch(fail);
+})();
+
+function esc2(s) {
+  if (window.KT && KT.escapeHtml) return KT.escapeHtml(String(s));
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+function fail(e) {
+  var msg = (e && e.message) || String(e);
+  var hint;
+  if (/资源版本不一致/.test(msg)) {
+    hint = '页面脚本与公共库版本不一致，通常是浏览器缓存了旧的 common.js。请强制刷新一次：<b>Cmd+Shift+R</b>（Windows：<b>Ctrl+F5</b>）。';
+  } else if (/缺少 file 或 task 参数/.test(msg)) {
+    hint = '请从「资料库」选择一份资料打开，或先用「上传处理」生成一份。';
+  } else if (/无法加载资料|无法加载任务|404/.test(msg)) {
+    hint = '这份资料可能已被删除。请返回「资料库」重新选择。';
+  } else {
+    hint = '请确认后端已启动，并查看服务端日志。';
+  }
+  $('page').innerHTML = '<div class="error-wrap"><b>加载失败：</b>' + esc2(msg) + '<br><br>' + hint
+    + '<br><br><a class="btn" href="/ui/client.html#library">返回资料库</a></div>';
+}
+</script>
+</body>
+</html>

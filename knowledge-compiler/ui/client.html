@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f9f9f7">
+<title>AnythingMindmap · 知识工作台</title>
+<script>try{if(localStorage.getItem("kt-theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");document.documentElement.setAttribute("data-mode","dark");}}catch(e){}</script>
+<link rel="stylesheet" href="cds-theme.css?v=2">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="client.css?v=17">
+</head>
+<body data-scene="home">
+<a class="skip-link" href="#sceneRoot">跳到主要内容</a>
+
+<div class="client-shell">
+  <header class="client-topbar" data-cds="ClaudeDesktopHeader">
+    <div class="topbar-left">
+      <a class="brand" href="#home" data-scene-link="home" aria-label="AnythingMindmap 首页">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 27V13.5"/>
+          <path d="M16 18.5c-3.6 0-6.5-2.9-6.5-6.5S12.4 5.5 16 5.5s6.5 2.9 6.5 6.5-2.9 6.5-6.5 6.5Z"/>
+          <path d="M16 14.5c0-3 2.2-5.5 5.1-6.1"/>
+          <path d="M16 18.5c4.4 0 8 3.6 8 8"/>
+          <path d="M16 18.5c-4.4 0-8 3.6-8 8"/>
+        </svg>
+      </span>
+      <span class="brand-copy">
+        <strong>AnythingMindmap</strong>
+        <small>知识工作台</small>
+      </span>
+      </a>
+    </div>
+
+    <nav class="scene-bar" id="sceneBar" data-cds="SegmentedControl" role="tablist" aria-label="场景切换" style="--scene-index:0;--scene-count:5">
+      <span class="scene-thumb" aria-hidden="true"></span>
+      <button class="scene-tab is-active" type="button" role="tab" data-scene-link="home" aria-selected="true" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20H4z"/><path d="M9.5 20v-5.5h5V20"/></svg>
+        <span>首页</span>
+      </button>
+      <button class="scene-tab" type="button" role="tab" data-scene-link="parse" aria-selected="false" tabindex="-1">
+        <span data-icon="scan"></span><span>解析</span>
+      </button>
+      <button class="scene-tab" type="button" role="tab" data-scene-link="library" aria-selected="false" tabindex="-1">
+        <span data-icon="folder"></span><span>资源库</span>
+      </button>
+      <button class="scene-tab" type="button" role="tab" data-scene-link="mindmap" aria-selected="false" tabindex="-1">
+        <span data-icon="tree"></span><span>导图</span>
+      </button>
+      <button class="scene-tab" type="button" role="tab" data-scene-link="chat" aria-selected="false" tabindex="-1">
+        <span data-icon="message"></span><span>AI 对话</span>
+      </button>
+    </nav>
+
+    <div class="topbar-actions">
+      <button class="doc-context" id="docContextBtn" type="button" title="当前资料" aria-haspopup="dialog" aria-expanded="false">
+        <span class="doc-context-icon" data-icon="file" aria-hidden="true"></span>
+        <span class="doc-context-copy">
+          <small>当前资料</small>
+          <strong id="docContextName">未选择</strong>
+        </span>
+        <span data-icon="chevronDown" class="doc-context-caret"></span>
+      </button>
+      <div class="doc-popover" id="docPopover" role="dialog" aria-label="当前资料与最近资料" hidden>
+        <div class="popover-head">
+          <div><span class="section-kicker">DOCUMENT CONTEXT</span><h3>当前资料</h3></div>
+          <button class="icon-btn compact" type="button" id="docPopoverClose" aria-label="关闭资料面板"><span data-icon="close"></span></button>
+        </div>
+        <div class="doc-popover-current" id="docPopoverCurrent"></div>
+        <div class="popover-subhead"><span>最近打开</span><button class="text-link" type="button" data-scene-link="library">全部资料 <span data-icon="chevronRight"></span></button></div>
+        <div class="doc-popover-list scroll-fade" id="docPopoverList"></div>
+        <div class="popover-actions">
+          <button class="btn btn-soft btn-sm" type="button" id="docPopoverOverview"><span data-icon="eye"></span>导览</button>
+          <button class="btn btn-primary btn-sm" type="button" id="docPopoverMindmap"><span data-icon="tree"></span>打开导图</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="docPopoverChat"><span data-icon="message"></span>对话</button>
+        </div>
+      </div>
+      <button class="icon-btn" id="themeBtn" type="button" title="切换主题" aria-label="切换主题">
+        <span id="themeBtnIcon" data-icon="moon"></span>
+      </button>
+      <button class="icon-btn user-btn" id="settingsBtn" type="button" title="设置与账户" aria-label="设置与账户">
+        <span data-icon="user"></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="client-body">
+    <aside class="workspace-rail" id="workspaceRail" aria-label="场景导航" hidden></aside>
+    <main class="scene-root" id="sceneRoot">
+    <!-- ───────────────────────── HOME ───────────────────────── -->
+    <section class="scene scene-home is-active" data-scene-view="home" aria-labelledby="homeTitle">
+      <div class="home-wrap">
+        <div class="home-hero">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-dot"></span> ANYTHINGMINDMAP</div>
+            <h1 id="homeTitle">构建你的导图</h1>
+            <p class="hero-lede">上传 PDF、Word 或 TXT，自动整理章节与重点，生成可浏览、可追问的知识地图。</p>
+            <div class="home-actions">
+              <button class="btn btn-primary btn-lg home-start-btn" type="button" data-scene-link="parse">
+                <span>Start</span><span data-icon="arrowRight"></span>
+              </button>
+              <button class="btn btn-soft btn-lg home-overview-btn" id="homeDeskBtn" type="button" title="打开概况" aria-controls="homeDashboard" aria-expanded="false">
+                <span data-icon="panel"></span><span>概况</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PARSE ───────────────────────── -->
+    <section class="scene scene-page-scene" data-scene-view="parse" aria-labelledby="parseTitle" hidden>
+      <div class="scene-page">
+        <header class="scene-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-dot"></span> NEW ANALYSIS</div>
+            <h1 id="parseTitle">解析与分析</h1>
+            <p>上传文档，AI 将为你提取核心内容，构建知识树，并生成结构化的知识体系。</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="parseSettingsBtn"><span data-icon="settings"></span>解析设置</button>
+        </header>
+
+        <div class="parse-layout">
+          <div class="parse-main">
+            <section class="panel upload-panel" id="uploadPanel">
+              <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="选择或拖入文档">
+                <input type="file" id="fileInput" accept=".pdf,.docx,.txt" multiple hidden>
+                <div class="drop-file-family" aria-hidden="true">
+                  <span class="drop-file-card pdf"><span data-icon="file"></span><b>PDF</b></span>
+                  <span class="drop-file-card docx"><span data-icon="file"></span><b>DOCX</b></span>
+                  <span class="drop-file-card txt"><span data-icon="file"></span><b>TXT</b></span>
+                </div>
+                <h2>拖拽文件到此处，或点击选择文件</h2>
+                <p>支持 PDF、DOCX、TXT 格式</p>
+                <button type="button" class="btn btn-primary btn-sm drop-select-btn" id="browseFilesBtn"><span data-icon="file"></span>选择文件</button>
+                <div class="drop-meta"><span>PDF</span><i></i><span>DOCX</span><i></i><span>TXT</span><span class="drop-limit">单次可上传多份</span></div>
+              </div>
+
+              <div class="parse-pipeline-ribbon" id="parsePipelineRibbon" aria-hidden="true">
+                <div class="ribbon-step"><span class="ribbon-dot"></span><span>准备文档</span></div>
+                <div class="ribbon-step"><span class="ribbon-dot"></span><span>提取文本</span></div>
+                <div class="ribbon-step"><span class="ribbon-dot"></span><span>构建知识树</span></div>
+                <div class="ribbon-step"><span class="ribbon-dot"></span><span>生成解读</span></div>
+                <div class="ribbon-step"><span class="ribbon-dot"></span><span>完成</span></div>
+              </div>
+
+              <div class="file-stack" id="parseFileList" aria-live="polite"></div>
+
+              <div class="config-strip" id="parseConfigStrip">
+                <span class="config-pulse" aria-hidden="true"></span>
+                <span id="parseConfigText">正在读取统一配置…</span>
+                <button class="text-link" type="button" id="openSettingsFromParse">管理配置 <span data-icon="chevronRight"></span></button>
+              </div>
+
+              <div class="upload-actions">
+                <div class="upload-note" id="parseFileSummary">还没有选择文件</div>
+                <button class="btn btn-primary btn-lg" type="button" id="startParseBtn" disabled><span data-icon="scan"></span>开始解析</button>
+              </div>
+
+              <div class="parse-progress" id="parseProgress" hidden aria-live="polite">
+                <div class="progress-top">
+                  <div><span class="section-kicker">PROCESSING</span><h3 id="progressTitle">正在准备文档…</h3></div>
+                  <strong id="progressPercent">0%</strong>
+                </div>
+                <div class="progress-track"><span id="progressFill"></span></div>
+                <div class="stage-track" id="stageTrack" data-cds="StatusIndicators">
+                  <div class="stage-item" data-stage="splitting"><span class="stage-dot"></span><span>准备文档</span></div>
+                  <div class="stage-item" data-stage="ocr_converting"><span class="stage-dot"></span><span>提取文本</span></div>
+                  <div class="stage-item" data-stage="building_tree"><span class="stage-dot"></span><span>构建知识树</span></div>
+                  <div class="stage-item" data-stage="ai_enhancing"><span class="stage-dot"></span><span>生成解读</span></div>
+                  <div class="stage-item" data-stage="complete"><span class="stage-dot"></span><span>完成</span></div>
+                </div>
+                <p class="progress-message" id="progressMessage">准备中…</p>
+              </div>
+            </section>
+
+            <section class="panel parse-result" id="parseResult" hidden aria-live="polite">
+              <div class="result-hero">
+                <span class="result-check"><span data-icon="check"></span></span>
+                <div><span class="section-kicker">ANALYSIS COMPLETE</span><h2 id="resultTitle">知识树已生成</h2><p id="resultSubtitle">章节、知识点与导学已经准备好。</p></div>
+              </div>
+              <div class="result-metrics" id="resultMetrics"></div>
+              <div class="result-report" id="resultReport"></div>
+              <div class="result-actions">
+                <button class="btn btn-primary" type="button" id="resultMindmapBtn"><span data-icon="tree"></span>打开导图</button>
+                <button class="btn btn-secondary" type="button" id="resultOverviewBtn"><span data-icon="eye"></span>查看导览</button>
+                <button class="btn btn-ghost" type="button" id="resultChatBtn"><span data-icon="message"></span>开始对话</button>
+                <button class="text-link result-reset" type="button" id="resultResetBtn">继续解析下一份 <span data-icon="chevronRight"></span></button>
+              </div>
+            </section>
+          </div>
+
+          <aside class="parse-aside">
+            <section class="aside-card">
+              <div class="aside-head"><span class="section-kicker">PIPELINE</span><span class="mini-badge">本地运行</span></div>
+              <h3>这次的加工流程</h3>
+              <ol class="pipeline-list">
+                <li><span>01</span><div><strong>识别结构</strong><small>标题、编号与章节边界</small></div></li>
+                <li><span>02</span><div><strong>保留原文</strong><small>正文不改写，只重新归属</small></div></li>
+                <li><span>03</span><div><strong>生成解读</strong><small>摘要、考点与章节导学</small></div></li>
+                <li><span>04</span><div><strong>建立关联</strong><small>生成可浏览、可对话的知识树</small></div></li>
+              </ol>
+            </section>
+            <section class="aside-card recent-task-card">
+              <div class="aside-head"><span class="section-kicker">RECENT</span><button class="text-link" type="button" data-scene-link="library">全部</button></div>
+              <h3>最近处理</h3>
+              <div class="aside-recent-list" id="parseRecentList"><div class="skeleton-row"></div><div class="skeleton-row"></div></div>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── LIBRARY ───────────────────────── -->
+    <section class="scene scene-page-scene" data-scene-view="library" aria-labelledby="libraryTitle" hidden>
+      <div class="scene-page library-page">
+        <header class="scene-heading library-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-dot"></span> KNOWLEDGE LIBRARY</div>
+            <h1 id="libraryTitle">资源库</h1>
+            <p>管理你的知识树文档，随时访问和继续学习。</p>
+          </div>
+          <div class="scene-heading-actions">
+            <button class="btn btn-soft" type="button" id="importPackageBtn"><span data-icon="upload"></span>导入数据包</button>
+            <button class="btn btn-primary" type="button" data-scene-link="parse"><span data-icon="scan"></span>解析新资料</button>
+            <input type="file" id="packageInput" accept=".zip,.json,application/zip,application/json" hidden>
+          </div>
+        </header>
+
+        <div class="library-toolbar">
+          <label class="search-field" for="librarySearch">
+            <span data-icon="search"></span>
+            <input id="librarySearch" type="search" placeholder="搜索文档、知识树、关键词…" autocomplete="off">
+            <kbd>⌘ K</kbd>
+          </label>
+          <div class="filter-pills" id="libraryFilters" role="group" aria-label="资料筛选">
+            <button type="button" class="filter-pill is-active" data-filter="all">全部</button>
+            <button type="button" class="filter-pill" data-filter="favorites">收藏夹</button>
+            <button type="button" class="filter-pill" data-filter="recent">最近</button>
+            <button type="button" class="filter-pill" data-filter="large">大型知识树</button>
+            <button type="button" class="filter-pill" data-filter="incomplete">未完成</button>
+          </div>
+          <label class="sort-control"><span data-icon="list"></span><select id="librarySort" aria-label="排序方式"><option value="modified">最近更新</option><option value="title">标题 A–Z</option><option value="nodes">知识点最多</option><option value="custom">手动排序</option></select></label>
+        </div>
+
+        <div class="library-summary" id="librarySummary"></div>
+        <div class="resource-grid" id="libraryGrid" aria-live="polite">
+          <div class="resource-skeleton"></div><div class="resource-skeleton"></div><div class="resource-skeleton"></div>
+        </div>
+        <div class="empty-panel" id="libraryEmpty" hidden>
+          <span class="empty-icon" data-icon="folder"></span>
+          <h2>资料库还是空的</h2>
+          <p>上传第一份资料，解析完成后它会出现在这里。</p>
+          <button class="btn btn-primary" type="button" data-scene-link="parse">开始解析</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── MINDMAP / OVERVIEW ───────────────────────── -->
+    <section class="scene scene-mindmap-scene" data-scene-view="mindmap" aria-labelledby="previewTitle" hidden>
+      <div class="preview-shell" id="previewShell">
+        <header class="preview-topbar" id="previewTopbar">
+          <div class="preview-title-wrap">
+            <button class="icon-btn compact" type="button" data-scene-link="library" title="返回资料库" aria-label="返回资料库"><span data-icon="chevronLeft"></span></button>
+            <div>
+              <span class="section-kicker">CURRENT DOCUMENT</span>
+              <h1 id="previewTitle">选择一份资料</h1>
+            </div>
+          </div>
+          <div class="preview-actions" id="previewActions" hidden>
+            <div class="subview-tabs" role="tablist" aria-label="预览视图">
+              <button type="button" class="subview-tab is-active" data-preview-mode="overview" role="tab" aria-selected="true">导览</button>
+              <button type="button" class="subview-tab" data-preview-mode="canvas" role="tab" aria-selected="false">导图</button>
+            </div>
+            <button class="btn btn-soft btn-sm" type="button" id="openFullPreviewBtn"><span data-icon="external"></span>新窗口</button>
+            <button class="btn btn-soft btn-sm" type="button" id="previewChatBtn"><span data-icon="message"></span>AI 对话</button>
+          </div>
+        </header>
+
+        <div class="preview-picker" id="previewPicker">
+          <div class="picker-intro">
+            <span class="picker-glyph" data-icon="tree"></span>
+            <div><span class="section-kicker">OPEN A MINDMAP</span><h2>从一份资料开始漫游</h2><p>选择知识树后，这里会显示全书导览与沉浸式导图。</p></div>
+          </div>
+          <div class="picker-grid" id="pickerGrid"><div class="resource-skeleton"></div><div class="resource-skeleton"></div></div>
+        </div>
+
+        <div class="preview-stage" id="previewStage" hidden>
+          <div class="preview-split" id="previewSplit" data-pane-dragging="false">
+            <aside class="preview-sidepane" id="previewSidepane" aria-label="资料上下文">
+              <div class="sidepane-head">
+                <div><span class="section-kicker">DOCUMENT CONTEXT</span><h2>资料上下文</h2></div>
+                <button class="icon-btn compact" id="sidepaneCollapseBtn" type="button" title="收起侧栏" aria-label="收起侧栏"><span data-icon="chevronLeft"></span></button>
+              </div>
+              <div class="sidepane-doc" id="previewSideDoc"></div>
+              <div class="sidepane-section">
+                <div class="sidepane-section-head"><span class="section-kicker">CHAPTERS</span><button class="text-link" type="button" id="sidepaneOverviewBtn">全书导览 <span data-icon="chevronRight"></span></button></div>
+                <div class="sidepane-chapter-list scroll-fade" id="previewChapterList"></div>
+              </div>
+              <div class="sidepane-actions">
+                <button class="btn btn-soft btn-sm" type="button" id="sidepaneChatBtn"><span data-icon="message"></span>AI 对话</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="sidepaneFullBtn"><span data-icon="external"></span>新窗口</button>
+              </div>
+            </aside>
+            <div class="preview-resizer" id="previewResizer" role="separator" tabindex="0" aria-orientation="vertical" aria-label="拖拽调整侧栏宽度，双击恢复默认宽度，按 Escape 撤销">
+              <span></span>
+            </div>
+            <div class="preview-frame-pane" id="previewFramePane">
+              <div class="preview-view-switch" id="previewViewSwitch" hidden>
+                <div class="view-switch-rail" id="previewViewRail" role="tablist" aria-label="资料视图">
+                  <span class="view-switch-thumb" id="previewViewThumb" aria-hidden="true"></span>
+                  <button class="view-switch-item is-active" type="button" role="tab" data-preview-view="overview" aria-selected="true" tabindex="0"><span data-icon="menu"></span><span>导览</span></button>
+                  <button class="view-switch-item" type="button" role="tab" data-preview-view="canvas" aria-selected="false" tabindex="-1"><span data-icon="tree"></span><span>导图</span></button>
+                </div>
+              </div>
+              <button class="preview-side-expand" id="previewSideExpand" type="button" title="展开资料上下文" aria-label="展开资料上下文"><span data-icon="chevronRight"></span></button>
+              <button class="mindmap-rail-expand" id="mindmapRailExpandBtn" type="button" title="展开大纲" aria-label="展开大纲" aria-controls="workspaceRail" aria-expanded="false" hidden><span data-icon="panel"></span></button>
+              <div class="preview-loading" id="previewLoading"><span class="loading-spinner"></span><span>正在准备知识地图…</span></div>
+              <iframe id="previewFrame" title="资料导览与思维导图" loading="eager" allow="clipboard-write"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── CHAT ───────────────────────── -->
+    <section class="scene scene-chat-scene" data-scene-view="chat" aria-labelledby="chatTitle" hidden>
+      <div class="chat-shell">
+        <main class="chat-main">
+          <div class="chat-side-controls">
+            <button class="chat-side-expand is-left" id="chatRailExpandBtn" type="button" title="展开左侧导航" aria-controls="workspaceRail" aria-expanded="false" hidden>
+              <span data-icon="panel"></span><span>导航</span>
+            </button>
+            <button class="chat-side-expand is-right" id="chatInsightsExpandBtn" type="button" title="展开知识库" aria-controls="chatInsights" aria-expanded="false" hidden>
+              <span data-icon="quote"></span><span>知识库</span>
+            </button>
+          </div>
+          <div class="chat-content">
+            <header class="chat-hero" id="chatHero">
+              <span class="chat-spark" data-icon="spark" aria-hidden="true"></span>
+              <div>
+                <h1 id="chatTitle">你好，我是你的学习伙伴</h1>
+                <p>基于知识树内容，为你提供更有针对性的学习解答和思路引导。</p>
+              </div>
+            </header>
+
+            <div class="chat-workspace">
+              <div class="chat-widget-mount" id="chatWidgetMount" data-cds="ChatMessageView"></div>
+              <div class="chat-empty" id="chatEmpty">
+                <div class="chat-empty-orb" aria-hidden="true"><span data-icon="message"></span></div>
+                <h2>先选择一份资料</h2>
+                <p>AI 需要一份知识树作为上下文。去资料库选一份，或先解析一份新资料。</p>
+                <div class="chat-empty-actions"><button class="btn btn-primary" type="button" data-scene-link="library">浏览资料</button><button class="btn btn-ghost" type="button" data-scene-link="parse">解析新资料</button></div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <aside class="chat-insights" id="chatInsights" aria-label="知识库与对话设置">
+          <div class="chat-insights-head">
+            <div class="chat-insights-tabs" role="tablist" aria-label="对话侧栏">
+              <button class="chat-insights-tab is-active" type="button" role="tab" aria-selected="true" data-chat-panel="knowledge">知识库</button>
+              <button class="chat-insights-tab" type="button" role="tab" aria-selected="false" data-chat-panel="settings">对话设置</button>
+            </div>
+            <button class="icon-btn compact chat-insights-collapse" id="chatInsightsCollapseBtn" type="button" title="收起右侧栏" aria-label="收起右侧栏" aria-controls="chatInsights" aria-expanded="true">
+              <span data-icon="chevronRight"></span>
+            </button>
+          </div>
+
+          <div class="chat-insights-panel" id="chatKnowledgePanel">
+            <section class="chat-insight-section">
+              <div class="chat-insight-head"><span data-icon="file"></span><strong>当前文档</strong></div>
+              <button class="chat-insight-doc" id="chatInsightDocBtn" type="button" aria-expanded="false" aria-controls="chatDocPicker" title="切换当前文档">
+                <span class="chat-insight-doc-icon" data-icon="file"></span>
+                <span><strong id="chatInsightDocName">未选择资料</strong><small id="chatInsightDocMeta">从资料库选择一份知识树</small></span>
+                <span data-icon="chevronRight"></span>
+              </button>
+              <div class="chat-doc-picker" id="chatDocPicker" hidden>
+                <div class="chat-doc-picker-label">切换当前文档</div>
+                <div class="chat-doc-picker-list" id="chatDocPickerList"></div>
+              </div>
+            </section>
+
+            <section class="chat-insight-section">
+              <div class="chat-insight-head"><span data-icon="quote"></span><strong>引用来源</strong></div>
+              <div class="chat-source-list" id="chatSources"></div>
+            </section>
+
+            <section class="chat-insight-section chat-related-section">
+              <button class="chat-insight-head chat-related-toggle" id="chatRelatedToggle" type="button" aria-expanded="true" aria-controls="chatRelated">
+                <span data-icon="tree"></span><strong>相关知识点</strong><span class="chat-insight-count" id="chatRelatedCount">0</span><span class="chat-related-chevron" data-icon="chevronDown"></span>
+              </button>
+              <div class="chat-related-list" id="chatRelated"></div>
+            </section>
+          </div>
+
+          <div class="chat-insights-panel" id="chatSettingsPanel" hidden>
+            <section class="chat-insight-section">
+              <div class="chat-insight-head"><span data-icon="cpu"></span><strong>模型与上下文</strong></div>
+              <button class="chat-model-card" id="chatModelCard" data-cds="ModelSwitcherWithTokenGauge" type="button" title="打开模型与增强设置">
+                <span class="chat-model-mark"></span>
+                <span class="chat-model-copy">
+                  <small>MODEL</small>
+                  <strong id="chatModelName">正在读取模型</strong>
+                  <span class="chat-model-foot"><span id="chatModelMeta">统一配置</span><span class="chat-effort" id="chatEffort">标准</span></span>
+                </span>
+                <span class="chat-model-gauge" aria-hidden="true">
+                  <svg viewBox="0 0 48 48">
+                    <circle class="chat-gauge-track" cx="24" cy="24" r="17"></circle>
+                    <circle class="chat-gauge-value" id="chatGaugeValue" cx="24" cy="24" r="17"></circle>
+                  </svg>
+                  <span id="chatGaugePct">0%</span>
+                </span>
+              </button>
+              <div class="chat-token-caption" id="chatTokenCaption">估算上下文 0 / 200k tokens</div>
+            </section>
+
+            <section class="chat-insight-section chat-personalization">
+              <div class="chat-insight-head">
+                <span data-icon="settings"></span><strong>回答偏好</strong>
+                <button class="chat-prefs-reset" id="chatPrefsReset" type="button">恢复默认</button>
+              </div>
+              <p class="chat-pref-scope">用于学习模式与知识补全回答</p>
+
+              <div class="chat-pref-block">
+                <div class="chat-pref-row"><span>回复风格</span><em id="chatReplyStyleValue">自动</em></div>
+                <div class="chat-pref-seg" id="chatReplyStyleSeg" role="group" aria-label="回复风格">
+                  <button type="button" data-chat-pref="replyStyle" data-value="concise">简洁</button>
+                  <button type="button" data-chat-pref="replyStyle" data-value="auto" class="is-active" aria-pressed="true">自动</button>
+                  <button type="button" data-chat-pref="replyStyle" data-value="detailed">详细</button>
+                </div>
+                <p class="chat-pref-desc" id="chatReplyStyleDesc">根据问题复杂度自动调整篇幅。</p>
+              </div>
+
+              <div class="chat-pref-block">
+                <div class="chat-pref-row"><span>思考强度</span><em id="chatThinkingEffortValue">标准</em></div>
+                <div class="chat-pref-seg" id="chatThinkingEffortSeg" role="group" aria-label="思考强度">
+                  <button type="button" data-chat-pref="thinkingEffort" data-value="fast">快速</button>
+                  <button type="button" data-chat-pref="thinkingEffort" data-value="standard" class="is-active" aria-pressed="true">标准</button>
+                  <button type="button" data-chat-pref="thinkingEffort" data-value="deep">深入</button>
+                </div>
+                <p class="chat-pref-desc" id="chatThinkingEffortDesc">先梳理关键依据，再组织回答。</p>
+              </div>
+
+              <div class="chat-pref-block">
+                <div class="chat-pref-row"><span>引用偏好</span><em id="chatCitationStyleValue">自动</em></div>
+                <div class="chat-pref-seg" id="chatCitationStyleSeg" role="group" aria-label="引用偏好">
+                  <button type="button" data-chat-pref="citationStyle" data-value="minimal">精简</button>
+                  <button type="button" data-chat-pref="citationStyle" data-value="auto" class="is-active" aria-pressed="true">自动</button>
+                  <button type="button" data-chat-pref="citationStyle" data-value="strong">强调</button>
+                </div>
+                <p class="chat-pref-desc" id="chatCitationStyleDesc">按回答需要附带书内出处。</p>
+              </div>
+
+              <div class="chat-pref-block">
+                <div class="chat-pref-row"><span>回答语言</span><em id="chatLanguageValue">中文</em></div>
+                <div class="chat-pref-seg is-two" id="chatLanguageSeg" role="group" aria-label="回答语言">
+                  <button type="button" data-chat-pref="language" data-value="zh" class="is-active" aria-pressed="true">中文</button>
+                  <button type="button" data-chat-pref="language" data-value="bilingual">中英术语</button>
+                </div>
+                <p class="chat-pref-desc" id="chatLanguageDesc">使用中文术语与表达。</p>
+              </div>
+
+              <label class="chat-pref-custom">
+                <span>自定义指令</span>
+                <textarea id="chatCustomInstruction" maxlength="300" rows="3" placeholder="例如：多用例子解释，遇到公式先拆步骤…"></textarea>
+                <small>会附加到后续学习回答，不覆盖资料依据与安全约束。</small>
+              </label>
+            </section>
+
+            <div class="chat-tip">
+              <span data-icon="target"></span>
+              <p>试试从「这章的重点是什么」或「用三个问题考考我」开始。</p>
+            </div>
+            <div class="chat-context-footer"><span class="live-dot"></span>默认依据本地知识树 · 可选 AI 知识补全</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+    </main>
+  </div>
+
+  <div class="home-desk-backdrop" id="homeDeskBackdrop" hidden></div>
+  <div class="home-dashboard" id="homeDashboard" role="dialog" aria-modal="false" aria-hidden="true" aria-label="概况" tabindex="-1" inert>
+    <div class="dashboard-head">
+      <div>
+        <h2>概况</h2>
+        <span class="section-kicker">OVERVIEW</span>
+      </div>
+      <div class="dashboard-head-actions">
+        <button class="text-link" type="button" data-scene-link="library">查看全部 <span data-icon="chevronRight"></span></button>
+        <button class="icon-btn compact" id="closeHomeDeskBtn" type="button" title="收起概况" aria-label="收起概况"><span data-icon="close"></span></button>
+      </div>
+    </div>
+    <div class="metric-row" id="homeMetrics">
+      <div class="metric-card"><span class="metric-icon" data-icon="file"></span><strong class="metric-number" id="metricTrees">—</strong><span>份资料</span><em>本地同步</em></div>
+      <div class="metric-card"><span class="metric-icon" data-icon="tree"></span><strong class="metric-number" id="metricNodes">—</strong><span>个知识点</span><em>持续生长</em></div>
+      <div class="metric-card"><span class="metric-icon" data-icon="check"></span><strong class="metric-number" id="metricTasks">—</strong><span>个进行中</span><em>后台处理</em></div>
+    </div>
+    <div class="recent-head">
+      <h3>最近的知识树</h3>
+      <button class="text-link" type="button" data-scene-link="library">查看全部 <span data-icon="chevronRight"></span></button>
+    </div>
+    <div class="home-recent-list scroll-fade" id="homeRecentList">
+      <div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>
+    </div>
+    <div class="home-active-task" id="homeActiveTask" hidden></div>
+  </div>
+</div>
+
+<div class="palette-backdrop" id="paletteBackdrop" hidden></div>
+<section class="command-palette" data-cds="Dialog" id="commandPalette" role="dialog" aria-modal="true" aria-labelledby="paletteTitle" hidden>
+  <div class="palette-search">
+    <span data-icon="search"></span>
+    <input id="paletteInput" type="search" placeholder="跳转到场景、打开资料或执行操作…" autocomplete="off" aria-label="搜索命令">
+    <kbd>ESC</kbd>
+  </div>
+  <div class="palette-content scroll-fade" id="paletteContent">
+    <div class="palette-group">
+      <div class="palette-label" id="paletteTitle">场景</div>
+      <button class="palette-item" type="button" data-command-scene="home"><span class="palette-item-icon" data-icon="folder"></span><span><strong>首页</strong><small>回到今日工作台</small></span></button>
+      <button class="palette-item" type="button" data-command-scene="parse"><span class="palette-item-icon" data-icon="scan"></span><span><strong>解析新资料</strong><small>上传 PDF、Word 或 TXT</small></span></button>
+      <button class="palette-item" type="button" data-command-scene="library"><span class="palette-item-icon" data-icon="folder"></span><span><strong>资料库</strong><small>浏览全部知识树</small></span></button>
+      <button class="palette-item" type="button" data-command-scene="mindmap"><span class="palette-item-icon" data-icon="tree"></span><span><strong>导图预览</strong><small>导览与沉浸式导图</small></span></button>
+      <button class="palette-item" type="button" data-command-scene="chat"><span class="palette-item-icon" data-icon="message"></span><span><strong>AI 对话</strong><small>基于当前资料学习或追问</small></span></button>
+    </div>
+    <div class="palette-group">
+      <div class="palette-label">最近资料</div>
+      <div id="paletteResources"></div>
+    </div>
+    <div class="palette-group">
+      <div class="palette-label">操作</div>
+      <button class="palette-item" type="button" data-command-action="settings"><span class="palette-item-icon" data-icon="settings"></span><span><strong>打开设置</strong><small>模型、MinerU、学科与增强范围</small></span><kbd>⌘ ,</kbd></button>
+      <button class="palette-item" type="button" data-command-action="theme"><span class="palette-item-icon" id="paletteThemeIcon" data-icon="moon"></span><span><strong>切换主题</strong><small>在浅色与深色之间切换</small></span></button>
+    </div>
+    <div class="palette-empty" id="paletteEmpty" hidden>没有匹配的命令或资料</div>
+  </div>
+  <footer class="palette-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>↵</kbd> 打开</span><span><kbd>ESC</kbd> 关闭</span></footer>
+</section>
+
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="settings-drawer" data-cds="Dialog" id="settingsDrawer" aria-hidden="true" aria-label="统一设置">
+  <header class="drawer-head">
+    <div><span class="section-kicker">WORKSPACE SETTINGS</span><h2>统一设置</h2></div>
+    <button class="icon-btn" type="button" id="closeSettingsBtn" aria-label="关闭设置"><span data-icon="close"></span></button>
+  </header>
+  <div class="drawer-body"><iframe id="settingsFrame" title="统一设置"></iframe></div>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="common.js?v=7"></script>
+<script src="review_widget.js?v=29"></script>
+<script src="client.js?v=12"></script>
+</body>
+</html>

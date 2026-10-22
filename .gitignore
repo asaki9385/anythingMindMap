@@ -1,0 +1,57 @@
+# Data files
+knowledge-compiler/data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dev tools
+.claude/
+node_modules/
+
+# Local scratch files
+all_source_code.txt
+*.pdf
+
+# Release/build outputs
+dist/
+*.zip
+.deps_installed
+
+# Presentation/demo build artifacts (not part of the runtime package)
+.deck-build/
+.deck-anim-build/
+.deck-support-build/
+open-claude-ui-main/
+demo-video/
+remotion-ppt-support/
+*.ppt
+*.pptx
+*.key
+*.mp4
+
+# Local-only archive for old pages, process docs, and showcase builds
+_archive/

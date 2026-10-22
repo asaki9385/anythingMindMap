@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script src="embed-mode.js?v=1"></script>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设置 · AnythingMindmap</title>
+<link rel="stylesheet" href="cds-theme.css?v=1">
+<link rel="stylesheet" href="theme.css?v=3">
+<link rel="stylesheet" href="client-embed.css?v=1">
+<style>
+body { overflow-y: auto; }
+.page { max-width: 860px; margin: 0 auto; padding: 0 20px 80px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 20px; background: var(--surface-overlay); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar h1 { font-family: var(--font-serif); font-size: 17px; font-weight: 700; }
+.topbar h1 a { text-decoration: none; color: inherit; }
+.topbar .tb-right { display: flex; gap: 10px; align-items: center; }
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+  background: var(--surface-raised); border: 1px solid var(--border);
+  border-radius: var(--radius-full); cursor: pointer; font-size: 12px; color: var(--ink-secondary);
+}
+
+.hero { padding: 26px 0 6px; }
+.hero h2 { font-family: var(--font-serif); font-size: 26px; margin-bottom: 6px; }
+.hero p { color: var(--ink-muted); font-size: 13.5px; line-height: 1.7; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 22px 24px; margin-top: 18px; box-shadow: var(--shadow-sm);
+}
+.card > h3 {
+  font-family: var(--font-serif); font-size: 17px; margin-bottom: 4px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card .card-sub { font-size: 12.5px; color: var(--ink-muted); line-height: 1.65; margin-bottom: 14px; }
+
+/* ── 开关行（结构审校） ── */
+.check-row {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  font-size: 13px; color: var(--ink-secondary); line-height: 1.6;
+}
+.check-row input[type="checkbox"] {
+  width: 16px; height: 16px; margin: 2px 0 0; flex: none; cursor: pointer;
+  accent-color: var(--accent);
+}
+.check-row:hover { color: var(--ink); }
+
+.btn {
+  padding: 7px 15px; border-radius: var(--radius-full); cursor: pointer; font-size: 13px;
+  background: var(--surface-raised); color: var(--ink-secondary);
+  border: 1px solid var(--border); transition: all .2s; white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent-hover); background: var(--tag-accent-bg); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-hover); color: #fff; }
+.btn.danger { color: var(--danger); border-color: var(--danger); background: var(--surface-raised); }
+.btn.danger:hover { background: rgba(196,64,64,.08); }
+.btn.sm { padding: 4px 11px; font-size: 12px; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ── Provider list ── */
+.prov {
+  display: flex; align-items: center; gap: 12px; padding: 13px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 8px;
+  background: var(--canvas);
+}
+.prov.active { border-color: var(--accent); background: var(--tag-accent-bg); }
+.prov .pv-main { flex: 1; min-width: 0; }
+.prov .pv-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.prov .pv-meta { font-size: 11.5px; color: var(--ink-muted); margin-top: 3px; word-break: break-all; line-height: 1.5; }
+.prov .pv-meta code { font-family: var(--font-mono); font-size: 11px; background: var(--surface-raised); padding: 0 4px; border-radius: 3px; }
+.prov .pv-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.badge {
+  font-size: 10.5px; padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--success); color: #fff; font-weight: 600;
+}
+.badge.plain { background: var(--surface-raised); color: var(--ink-muted); border: 1px solid var(--border); }
+.badge.ok { background: #e2f2e6; color: #2e7a44; border: 1px solid #2e7a44; }
+.badge.warn { background: #faeed8; color: #a8681e; border: 1px solid #a8681e; }
+
+/* ── Form ── */
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; color: var(--ink-muted); margin-bottom: 5px; }
+.field input, .field select {
+  width: 100%; padding: 9px 12px; background: var(--canvas); color: var(--ink);
+  border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 13px; outline: none;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--focus-ring); }
+.field .fhint { font-size: 11px; color: var(--ink-muted); margin-top: 4px; line-height: 1.5; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+.key-wrap { position: relative; }
+.key-wrap input { padding-right: 64px; }
+.key-wrap .eye {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: 12px;
+}
+.form-actions { display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
+  .enh-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+  .enh-opt {
+    text-align: left; padding: 12px 14px; border-radius: var(--radius-md); cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface);
+    display: flex; flex-direction: column; gap: 5px; font-family: inherit; color: var(--ink);
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  }
+  .enh-opt:hover { border-color: var(--accent); background: var(--tag-accent-bg); }
+  .enh-opt.on { border-color: var(--accent); background: var(--tag-accent-bg); box-shadow: inset 0 0 0 1px var(--accent); }
+  .enh-opt .t { font-weight: var(--weight-bold); font-size: 13px; }
+  .enh-opt .d { font-size: 11.5px; color: var(--ink-muted); line-height: 1.55; }
+.test-result { font-size: 12.5px; margin-top: 8px; line-height: 1.6; display: none; }
+.test-result.show { display: block; }
+.test-result.ok { color: var(--success); }
+.test-result.err { color: var(--danger); }
+
+/* ── Card head / collapsible provider form / section label ── */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.card-head > h3 { margin-bottom: 0; }
+.provider-form { display: none; margin-top: 16px; border-top: 1px dashed var(--border-strong); padding-top: 16px; }
+.provider-form.open { display: block; }
+.sec-label {
+  margin: 30px 0 -6px; font-size: var(--text-xs); font-weight: var(--weight-semibold);
+  color: var(--ink-muted); letter-spacing: 1px;
+}
+
+.banner {
+  display: none; margin-top: 18px; padding: 14px 18px; border-radius: var(--radius-md);
+  background: var(--tag-accent-bg); border: 1px solid var(--border-accent);
+  font-size: 13px; line-height: 1.7; color: var(--ink-secondary);
+}
+.banner.show { display: block; }
+.banner .row { margin-top: 10px; display: flex; gap: 8px; }
+.empty-hint { font-size: 13px; color: var(--ink-muted); padding: 10px 2px; }
+
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff; padding: 10px 22px; border-radius: var(--radius-full);
+  font-size: 13px; z-index: 2000; display: none; box-shadow: var(--shadow-lg); max-width: 70vw;
+}
+.toast.show { display: block; animation: toastInOut 2.6s forwards; }
+@keyframes toastInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Embedded in the client drawer: remove duplicate page chrome ── */
+html[data-embed="1"] .topbar { display: none !important; }
+html[data-embed="1"] body { background: var(--canvas); }
+html[data-embed="1"] .page { max-width: 100%; padding: 22px 26px 56px; }
+
+</style>
+<link rel="stylesheet" href="claude-pages.css?v=1">
+</head>
+<body>
+<div class="topbar">
+  <h1><a href="/ui/client.html#home"><span class="legacy-brand-mark" data-icon="tree"></span><span>AnythingMindmap · <span style="color:var(--accent)">统一设置</span></span></a></h1>
+  <div class="tb-right">
+    <a class="btn" href="/ui/client.html#home">返回首页</a>
+    <a class="btn" href="/ui/client.html#parse">上传处理</a>
+    <div class="theme-toggle" onclick="toggleThemeUI()"><span id="themeIcon"></span><span id="themeLabel">深色</span></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="hero">
+    <h2>一次配置，全局生效</h2>
+  </div>
+
+  <div class="banner" id="legacyBanner">
+    <strong>检测到本机浏览器里存有旧配置</strong>（上传页 / 复习页曾经填写的 Key）。<br>
+    可以一键填入下方表单，确认后保存到统一配置。
+    <div class="row">
+      <button class="btn primary sm" onclick="importLegacy()">一键导入</button>
+      <button class="btn sm" onclick="hideLegacy()">忽略</button>
+    </div>
+  </div>
+
+  <!-- 模型服务 -->
+  <div class="card">
+    <div class="card-head">
+      <h3><span data-icon="cpu"></span> 模型服务 <span class="badge plain" id="providerCount"></span></h3>
+      <button class="btn sm" id="addProviderBtn" onclick="startAddProvider()">＋ 添加服务商</button>
+    </div>
+    <div class="card-sub">AI 增强、导学与复习判分都使用当前的「默认」服务商。支持任意 OpenAI chat-completions 兼容端点（DeepSeek、OpenRouter、Kimi 等）。</div>
+    <div id="providerList"></div>
+
+    <div class="provider-form" id="providerForm">
+      <h3 style="font-size:14.5px;" id="formTitle">添加服务商</h3>
+      <div class="grid2">
+        <div class="field">
+          <label>预设（可选）</label>
+          <select id="presetSelect" onchange="applyPreset()"><option value="">选择预设自动填充…</option></select>
+        </div>
+        <div class="field">
+          <label>名称</label>
+          <input type="text" id="pvName" placeholder="例如：DeepSeek / opencode / 实验室中转">
+        </div>
+      </div>
+      <div class="field">
+        <label>Base URL</label>
+        <input type="text" id="pvBase" placeholder="https://api.deepseek.com 或 https://…/v1">
+        <div class="fhint">填 <code>…/v1</code> 或完整 <code>/chat/completions</code> 地址均可，自动补全。示例：<code>https://api.deepseek.com</code></div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>模型名</label>
+          <input type="text" id="pvModel" placeholder="例如：deepseek-v4-flash / gpt-5-mini">
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <div class="key-wrap">
+            <input type="password" id="pvKey" placeholder="sk-...">
+            <button class="eye" id="eyeBtn" onclick="toggleKeyVisible()">显示</button>
+          </div>
+          <div class="fhint" id="keyHint">保存后仅脱敏回显；编辑时留空 = 不修改。</div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" id="savePvBtn" onclick="saveProvider()">保存服务商</button>
+        <button class="btn" onclick="testFormProvider()" id="testPvBtn">测试连接</button>
+        <button class="btn" style="display:none;" id="cancelEditBtn" onclick="cancelEdit()">取消编辑</button>
+      </div>
+      <div class="test-result" id="pvTestResult"></div>
+    </div>
+  </div>
+
+  <!-- 其他设置 -->
+  <div class="sec-label">其他设置</div>
+
+  <!-- MinerU -->
+  <div class="card">
+    <h3><span data-icon="scan"></span> MinerU Token <span class="badge plain" id="mineruBadge"></span></h3>
+    <div class="card-sub">用于 PDF 扫描件的云端识别。不配置也能用（自动改用本地文本提取，扫描件效果差）。<a href="https://mineru.net" target="_blank" rel="noopener">前往 mineru.net <span data-icon="external"></span></a></div>
+    <div class="field">
+      <label>Token</label>
+      <div class="key-wrap">
+        <input type="password" id="mineruInput" placeholder="粘贴 MinerU Token（留空 = 不修改）">
+        <button class="eye" id="eyeBtn2" onclick="toggleMineruVisible()">显示</button>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn primary" onclick="saveMineru()">保存</button>
+      <button class="btn" onclick="testMineru()" id="testMineruBtn">测试连接</button>
+      <button class="btn danger sm" onclick="clearMineru()">清除</button>
+    </div>
+    <div class="test-result" id="mineruTestResult"></div>
+  </div>
+
+  <!-- 学科设置 -->
+  <div class="card">
+    <h3><span data-icon="target"></span> 学科设置</h3>
+    <div class="card-sub">决定 AI 标注考点时的参照标准（例如按「333教育综合考研」的题型与频次体系标注）。</div>
+    <div class="grid2">
+      <div class="field">
+        <label>科目名称</label>
+        <input type="text" id="subjectName" placeholder="教育学">
+      </div>
+      <div class="field">
+        <label>考试名称</label>
+        <input type="text" id="subjectExam" placeholder="333教育综合考研">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn primary" onclick="saveSubject()">保存</button>
+    </div>
+  </div>
+
+  <!-- 增强范围（档位化） -->
+  <div class="card">
+    <h3><span data-icon="settings"></span> 增强范围</h3>
+    <div class="card-sub">决定 AI 为多少个知识点生成解读（摘要 / 关键词 / 考点）。新上传的资料按此执行；已处理的资料重新解析后生效。</div>
+    <div class="enh-opts" id="enhOpts" role="radiogroup" aria-label="增强范围"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="cds-dialog-backdrop" id="confirmBackdrop" hidden></div>
+<section class="cds-dialog" id="confirmDialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody" hidden>
+  <div class="cds-dialog-icon"><span data-icon="alert"></span></div>
+  <div class="cds-dialog-copy">
+    <h3 id="confirmTitle">确认操作</h3>
+    <p id="confirmBody"></p>
+  </div>
+  <div class="cds-dialog-actions">
+    <button class="btn" type="button" id="confirmCancel">取消</button>
+    <button class="btn danger-solid" type="button" id="confirmOk">确认</button>
+  </div>
+</section>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="common.js?v=7"></script>
+<script>
+'use strict';
+window.KT = window.KT || {};
+KT.iconHtml = KT.iconHtml || function () { return ""; };
+KT.applyIconSlots = KT.applyIconSlots || function () {};
+KT.initTheme();
+
+var S = null;            // 当前设置视图
+var editingId = '';      // 正在编辑的服务商 id（空 = 新增）
+
+function $(id) { return document.getElementById(id); }
+function syncThemeUI() {
+  // 图标与文案统一交给公共库（旧版 common.js 时保持安静降级）
+  if (window.KT && typeof KT.updateThemeUI === 'function') KT.updateThemeUI();
+}
+function toggleThemeUI() { KT.toggleTheme(); syncThemeUI(); }
+function toast(msg) { KT.showToast(msg); }
+
+// ── CDS confirmation dialog ──
+var _confirmResolve = null;
+var _confirmReturnFocus = null;
+function openConfirmDialog(opts) {
+  opts = opts || {};
+  var dialog = $('confirmDialog');
+  var backdrop = $('confirmBackdrop');
+  if (!dialog || !backdrop) return Promise.resolve(false);
+  $('confirmTitle').textContent = opts.title || '确认操作';
+  $('confirmBody').textContent = opts.body || '';
+  $('confirmOk').textContent = opts.confirmLabel || '确认';
+  _confirmReturnFocus = document.activeElement;
+  dialog.hidden = false;
+  backdrop.hidden = false;
+  requestAnimationFrame(function () { dialog.classList.add('is-open'); backdrop.classList.add('is-open'); });
+  window.setTimeout(function () { $('confirmCancel').focus(); }, 40);
+  return new Promise(function (resolve) { _confirmResolve = resolve; });
+}
+function resolveConfirmDialog(ok) {
+  var dialog = $('confirmDialog');
+  var backdrop = $('confirmBackdrop');
+  if (!dialog || !backdrop) return;
+  dialog.classList.remove('is-open');
+  backdrop.classList.remove('is-open');
+  window.setTimeout(function () { dialog.hidden = true; backdrop.hidden = true; }, 220);
+  var resolve = _confirmResolve;
+  _confirmResolve = null;
+  if (resolve) resolve(!!ok);
+  var target = _confirmReturnFocus;
+  _confirmReturnFocus = null;
+  if (target && target.focus) window.setTimeout(function () { target.focus(); }, 20);
+}
+
+// ── 数据 ──
+
+async function fetchSettings() {
+  var res = await fetch('/api/settings');
+  S = await res.json();
+  renderProviders();
+  renderGeneral();
+  renderEnhance();
+  renderLegacyBanner();
+}
+
+async function post(payload) {
+  var res = await fetch('/api/settings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  var data = await res.json();
+  if (data.settings) { S = data.settings; renderProviders(); renderGeneral(); renderEnhance(); }
+  return data;
+}
+
+// ── 渲染 ──
+
+function renderProviders() {
+  var list = $('providerList');
+  var ps = (S && S.providers) || [];
+  var bi = (S && S.builtin) || {};
+  $('providerCount').textContent = ps.length ? ps.length + ' 个' : (bi.chat ? '使用内置' : '未配置');
+  if (!ps.length) {
+    list.innerHTML = bi.chat
+      ? '<div class="empty-hint">未添加自定义服务商，当前使用<b>内置模型服务</b>：'
+        + KT.escapeHtml(bi.chat_name || '') + '（' + KT.escapeHtml(bi.chat_model || '')
+        + '，Key ' + KT.escapeHtml(bi.chat_key_masked || '') + '）。添加服务商会覆盖内置。</div>'
+      : '<div class="empty-hint">还没有配置任何模型服务。AI 增强、导学、复习判分将处于离线降级状态。</div>';
+  } else {
+    list.innerHTML = ps.map(function (p) {
+      var verified = p.verified_at
+        ? '<span class="badge ok">已验证</span>' : '<span class="badge warn">未验证</span>';
+      var envNote = (!p.has_key && S.env.has_openai_key)
+        ? '<span class="badge plain">借用环境变量 Key</span>' : '';
+      return '<div class="prov' + (p.active ? ' active' : '') + '" data-pv-id="' + KT.escapeHtml(p.id) + '">'
+        + '<div class="pv-main">'
+        + '<div class="pv-name">' + KT.escapeHtml(p.name)
+        + (p.active ? '<span class="badge">默认</span>' : '')
+        + verified + envNote + '</div>'
+        + '<div class="pv-meta">' + KT.escapeHtml(p.model || '（未填模型）')
+        + ' · <code>' + KT.escapeHtml(p.base_url || '') + '</code></div>'
+        + '<div class="pv-meta">Key：' + (p.has_key ? KT.escapeHtml(p.key_masked) : (S.env.has_openai_key ? '（无，使用环境变量 ' + KT.escapeHtml(S.env.key_masked) + '）' : '未设置')) + '</div>'
+        + '</div>'
+        + '<div class="pv-actions">'
+        + (p.active ? '' : '<button class="btn sm" onclick="setActive(\'' + p.id + '\')">设为默认</button>')
+        + '<button class="btn sm" onclick="testSaved(\'' + p.id + '\')">测试</button>'
+        + '<button class="btn sm" onclick="editProvider(\'' + p.id + '\')">编辑</button>'
+        + '<button class="btn sm danger" onclick="removeProvider(\'' + p.id + '\')">删除</button>'
+        + '</div></div>';
+    }).join('');
+  }
+  // 刚保存的服务商：卡片浮入（与列表刷新配合，由 saveProvider 设置标记）
+  if (_pvEnterName && window.KT && KT.gsapReady()) {
+    var idx = -1;
+    for (var pi = 0; pi < ps.length; pi++) { if (ps[pi].name === _pvEnterName) { idx = pi; break; } }
+    var card = idx >= 0 ? list.children[idx] : null;
+    if (card) {
+      gsap.from(card, { autoAlpha: 0, y: 10, scale: 0.99, duration: 0.28, ease: 'power2.out',
+        clearProps: 'opacity,visibility,transform' });
+    }
+    _pvEnterName = '';
+  }
+
+  // 预设下拉
+  var sel = $('presetSelect');
+  if (sel.options.length <= 1 && S && S.presets) {
+    sel.innerHTML = '<option value="">选择预设自动填充…</option>' + S.presets.map(function (p, i) {
+      return '<option value="' + i + '">' + KT.escapeHtml(p.name) + '</option>';
+    }).join('');
+  }
+}
+
+function renderGeneral() {
+  if (!S) return;
+  $('subjectName').value = S.subject.name || '';
+  $('subjectExam').value = S.subject.exam || '';
+  var m = S.mineru;
+  $('mineruBadge').textContent = !m.has_token ? '未配置'
+    : (m.from_builtin ? '已配置（内置）' : (m.from_env ? '已配置（环境变量）' : '已配置'));
+  $('mineruInput').placeholder = m.from_builtin
+    ? '当前用内置 Token：' + m.token_masked + '（留空 = 继续用内置）'
+    : (m.has_token
+        ? '已保存：' + m.token_masked + '（留空 = 不修改）'
+        : '粘贴 MinerU Token');
+}
+
+function renderEnhance() {
+  if (!S || !S.enhance || !$('enhOpts')) return;
+  var cfg = S.enhance;
+  $('enhOpts').innerHTML = (cfg.options || []).map(function (o) {
+    return '<button type="button" role="radio" aria-checked="' + (o.id === cfg.scope) + '"'
+      + ' class="enh-opt' + (o.id === cfg.scope ? ' on' : '') + '" data-scope="' + o.id + '"'
+      + ' onclick="saveEnhance(\'' + o.id + '\')">'
+      + '<span class="t">' + KT.escapeHtml(o.label) + '</span>'
+      + '<span class="d">' + KT.escapeHtml(o.desc) + '</span></button>';
+  }).join('');
+}
+
+async function saveEnhance(scope) {
+  var data = await post({ op: 'set_enhance', scope: scope });
+  if (data && data.error) { toast('保存失败：' + data.error); return; }
+  renderEnhance();
+  var label = (data && data.enhance && data.enhance.label) || scope;
+  toast('增强范围已设为「' + label + '」');
+}
+
+function renderLegacyBanner() {
+  if (!S) return;
+  var cfg = readLegacy();
+  var hasSettings = (S.providers.length > 0) || S.mineru.has_token;
+  $('legacyBanner').classList.toggle('show', !!(cfg.deepseekKey || cfg.mineruToken) && !hasSettings);
+}
+
+function readLegacy() {
+  var out = { deepseekKey: '', mineruToken: '' };
+  try {
+    var raw = localStorage.getItem('kt-api-config');
+    if (raw) {
+      var cfg = JSON.parse(raw);
+      out.deepseekKey = cfg.deepseekKey || '';
+      out.mineruToken = cfg.mineruToken || '';
+    }
+    var k = localStorage.getItem('kt-deepseek-key');
+    if (k && !out.deepseekKey) out.deepseekKey = k;
+  } catch (e) {}
+  return out;
+}
+
+// ── 服务商操作 ──
+
+function applyPreset() {
+  var i = $('presetSelect').value;
+  if (i === '' || !S) return;
+  var p = S.presets[Number(i)];
+  if (!p) return;
+  $('pvName').value = p.name;
+  $('pvBase').value = p.base_url || '';
+  $('pvModel').value = p.model || '';
+  if (!p.base_url) $('pvBase').focus();
+}
+
+function toggleKeyVisible() {
+  var el = $('pvKey');
+  el.type = el.type === 'password' ? 'text' : 'password';
+  $('eyeBtn').textContent = el.type === 'password' ? '显示' : '隐藏';
+}
+function toggleMineruVisible() {
+  var el = $('mineruInput');
+  el.type = el.type === 'password' ? 'text' : 'password';
+  $('eyeBtn2').textContent = el.type === 'password' ? '显示' : '隐藏';
+}
+
+// 添加/编辑表单：展开过渡（无 GSAP / 减动效时瞬时展开）
+var _pvEnterName = '';
+function showProviderFormAnimated() {
+  var form = $('providerForm');
+  var wasOpen = form.classList.contains('open');
+  form.classList.add('open');
+  if (wasOpen || !window.KT || !KT.gsapReady()) return;
+  gsap.fromTo(form, { height: 0, autoAlpha: 0, overflow: 'hidden' },
+    { height: 'auto', autoAlpha: 1, duration: 0.3, ease: 'power2.out',
+      clearProps: 'height,opacity,visibility,overflow' });
+}
+function hideProviderFormAnimated(done) {
+  var form = $('providerForm');
+  if (!form.classList.contains('open') || !window.KT || !KT.gsapReady()) {
+    form.classList.remove('open');
+    if (done) done();
+    return;
+  }
+  gsap.to(form, { height: 0, autoAlpha: 0, overflow: 'hidden', duration: 0.22, ease: 'power1.in',
+    onComplete: function () {
+      form.classList.remove('open');
+      gsap.set(form, { clearProps: 'height,opacity,visibility,overflow' });
+      if (done) done();
+    } });
+}
+
+function editProvider(id) {
+  var p = (S.providers || []).filter(function (x) { return x.id === id; })[0];
+  if (!p) return;
+  editingId = id;
+  showProviderFormAnimated();
+  $('formTitle').textContent = '编辑：' + p.name;
+  $('pvName').value = p.name;
+  $('pvBase').value = p.base_url;
+  $('pvModel').value = p.model;
+  $('pvKey').value = '';
+  $('keyHint').textContent = p.has_key
+    ? '已保存（' + p.key_masked + '）；留空 = 不修改，填写则覆盖。'
+    : '该服务商还没有 Key。';
+  $('cancelEditBtn').style.display = '';
+  $('presetSelect').value = '';
+  $('pvTestResult').className = 'test-result';
+  window.scrollTo({ top: $('pvName').offsetTop - 160, behavior: 'smooth' });
+}
+
+function startAddProvider() {
+  cancelEdit();
+  showProviderFormAnimated();
+  window.scrollTo({ top: $('providerForm').offsetTop - 120, behavior: 'smooth' });
+  $('pvName').focus();
+}
+
+function cancelEdit() {
+  editingId = '';
+  hideProviderFormAnimated();
+  $('formTitle').textContent = '添加服务商';
+  $('pvName').value = ''; $('pvBase').value = ''; $('pvModel').value = ''; $('pvKey').value = '';
+  $('keyHint').textContent = '保存后仅脱敏回显；编辑时留空 = 不修改。';
+  $('cancelEditBtn').style.display = 'none';
+  $('pvTestResult').className = 'test-result';
+}
+
+async function saveProvider() {
+  var body = {
+    op: 'upsert_provider',
+    provider: {
+      name: $('pvName').value.trim(),
+      base_url: $('pvBase').value.trim(),
+      model: $('pvModel').value.trim(),
+      api_key: $('pvKey').value.trim()
+    }
+  };
+  if (editingId) body.provider.id = editingId;
+  if (!body.provider.base_url) { toast('Base URL 不能为空'); return; }
+  _pvEnterName = body.provider.name;   // 刷新列表后给这张卡片播入场
+  var data = await post(body);
+  if (data.error) { _pvEnterName = ''; toast('保存失败：' + data.error); return; }
+  toast('已保存');
+  cancelEdit();
+}
+
+function showTestResultAnimated(res) {
+  if (!window.KT || !KT.gsapReady()) return;
+  gsap.from(res, { autoAlpha: 0, y: 6, duration: 0.22, ease: 'power2.out',
+    clearProps: 'opacity,visibility,transform' });
+}
+
+async function testFormProvider() {
+  var res = $('pvTestResult');
+  res.className = 'test-result show';
+  res.textContent = '正在测试…';
+  showTestResultAnimated(res);
+  // 编辑已有服务商且未填 Key 时，用已保存的 Key / 端点测试
+  var payload = { op: 'test_provider', base_url: $('pvBase').value.trim(), model: $('pvModel').value.trim(), api_key: $('pvKey').value.trim() };
+  if (editingId) payload.id = editingId;
+  var data = await post(payload);
+  if (data.ok) {
+    res.className = 'test-result show ok';
+    res.innerHTML = KT.iconHtml('check') + ' 连接成功（' + Number(data.latency_ms || 0) + 'ms，模型 '
+      + KT.escapeHtml(data.model || '') + '）'
+      + (data.reply ? ' 回复：' + KT.escapeHtml(String(data.reply)) : '');
+  } else {
+    res.className = 'test-result show err';
+    res.innerHTML = KT.iconHtml('alert') + ' ' + KT.escapeHtml(data.error || '测试失败');
+  }
+  showTestResultAnimated(res);
+}
+
+async function testSaved(id) {
+  var data = await post({ op: 'test_provider', id: id });
+  if (data.ok) { toast('连接成功（' + data.latency_ms + 'ms）'); await fetchSettings(); }
+  else toast('测试失败：' + (data.error || ''));
+}
+
+async function setActive(id) {
+  await post({ op: 'set_active', id: id });
+  toast('已设为默认服务商');
+}
+
+async function removeProvider(id) {
+  var p = (S.providers || []).filter(function (x) { return x.id === id; })[0];
+  var ok = await openConfirmDialog({
+    title: '删除服务商？',
+    body: '删除「' + (p ? p.name : id) + '」后，相关 Base URL、模型与 Key 会一并移除。',
+    confirmLabel: '删除'
+  });
+  if (!ok) return;
+  var finish = async function () {
+    await post({ op: 'delete_provider', id: id });
+    if (editingId === id) cancelEdit();
+    toast('已删除');
+  };
+  var card = document.querySelector('.prov[data-pv-id="' + id + '"]');
+  if (card && window.KT && KT.gsapReady()) {
+    gsap.to(card, { autoAlpha: 0, x: 14, height: 0, paddingTop: 0, paddingBottom: 0, overflow: 'hidden',
+      duration: 0.22, ease: 'power1.in', onComplete: finish });
+  } else {
+    await finish();
+  }
+}
+
+// ── MinerU / 学科 ──
+
+async function saveMineru() {
+  var v = $('mineruInput').value.trim();
+  if (!v) { toast('请先粘贴 Token（留空不会修改）'); return; }
+  var data = await post({ op: 'set_general', mineru_token: v });
+  if (data.error) { toast('保存失败：' + data.error); return; }
+  $('mineruInput').value = '';
+  toast('MinerU Token 已保存');
+}
+
+async function testMineru() {
+  var res = $('mineruTestResult');
+  res.className = 'test-result show';
+  res.textContent = '正在测试…';
+  showTestResultAnimated(res);
+  var data = await post({ op: 'test_mineru', mineru_token: $('mineruInput').value.trim() });
+  if (data.ok) { res.className = 'test-result show ok'; res.innerHTML = KT.iconHtml('check') + ' ' + KT.escapeHtml(data.note || '通过'); }
+  else { res.className = 'test-result show err'; res.innerHTML = KT.iconHtml('alert') + ' ' + KT.escapeHtml(data.error || '失败'); }
+  showTestResultAnimated(res);
+}
+
+async function clearMineru() {
+  var ok = await openConfirmDialog({
+    title: '清除 MinerU Token？',
+    body: '清除后，PDF 扫描件将无法使用云端识别，必要时可以重新配置。',
+    confirmLabel: '清除'
+  });
+  if (!ok) return;
+  await post({ op: 'set_general', clear_mineru: true });
+  toast('已清除');
+}
+
+async function saveSubject() {
+  var data = await post({ op: 'set_general', subject: {
+    name: $('subjectName').value.trim(), exam: $('subjectExam').value.trim() } });
+  if (data.error) { toast('保存失败：' + data.error); return; }
+  toast('学科设置已保存');
+}
+
+// ── 旧配置导入 ──
+
+function importLegacy() {
+  var cfg = readLegacy();
+  if (cfg.deepseekKey) {
+    $('pvName').value = $('pvName').value || 'DeepSeek（从旧配置导入）';
+    $('pvBase').value = $('pvBase').value || 'https://api.deepseek.com';
+    $('pvModel').value = $('pvModel').value || 'deepseek-v4-flash';
+    $('pvKey').value = cfg.deepseekKey;
+  }
+  if (cfg.mineruToken) $('mineruInput').value = cfg.mineruToken;
+  $('providerForm').classList.add('open');
+  hideLegacy();
+  toast('已填入表单，请检查后保存');
+}
+function hideLegacy() { $('legacyBanner').classList.remove('show'); }
+
+syncThemeUI();
+$('confirmCancel').addEventListener('click', function () { resolveConfirmDialog(false); });
+$('confirmOk').addEventListener('click', function () { resolveConfirmDialog(true); });
+$('confirmBackdrop').addEventListener('click', function () { resolveConfirmDialog(false); });
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape' && !$('confirmDialog').hidden) resolveConfirmDialog(false);
+});
+fetchSettings().catch(function (e) { toast('读取配置失败：' + e.message); });
+</script>
+</body>
+</html>
