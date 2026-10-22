@@ -76,12 +76,12 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Create or update GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${GITHUB_REF_NAME}"
-          gh release view "$tag" >/dev/null 2>&1 || \
-            gh release create "$tag" --title "AnythingMindmap $tag" --generate-notes || true
-          shopt -s nullglob
-          assets=(dist/AnythingMindmap-source-*.zip dist/AnythingMindmap-macos-*.dmg)
-          gh release upload "$tag" "${assets[@]}" --clobber
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: AnythingMindmap ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/AnythingMindmap-source-*.zip
+            dist/AnythingMindmap-macos-*.dmg
