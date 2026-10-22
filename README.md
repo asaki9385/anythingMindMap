@@ -542,6 +542,7 @@ rsync -a \
 - `docs/AI对话机制与配置说明.md`：对话、判分与模型配置
 - `docs/统一配置中心.md`：模型服务 / MinerU / 学科 / 增强范围
 - `docs/解析报告面板.md`：解析报告的统计口径与前端展示
+- `docs/MACOS_BUILD.md`：macOS DMG 构建、冒烟测试与签名边界
 - `knowledge-compiler/docs/`：当前保留的解析、结构前置层与审校技术说明
 
 ## 数据目录

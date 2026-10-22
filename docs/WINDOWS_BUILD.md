@@ -2,7 +2,7 @@
 
 ## 产物
 
-GitHub Actions 的 `build-windows-portable` 工作流会生成：
+GitHub Actions 的 `build-release-assets` 工作流会生成：
 
 ```text
 AnythingMindmap-windows-x64.zip
@@ -43,7 +43,7 @@ git push -u origin main
 ## 手动触发构建
 
 1. 打开 GitHub 仓库的 **Actions** 页面。
-2. 选择 **build-windows-portable**。
+2. 选择 **build-release-assets**。
 3. 点击 **Run workflow**。
 4. 等待 Windows job 完成。
 5. 在本次运行页面底部下载 **AnythingMindmap-windows-x64** artifact。
@@ -59,10 +59,10 @@ git push origin v1.0.0
 
 标签推送后工作流会：
 
-1. 构建便携包。
+1. 构建源码 ZIP、Windows 便携包和 macOS DMG。
 2. 解压并运行 smoke test。
 3. 上传 artifact。
-4. 自动创建 GitHub Release，并把 ZIP 作为 Release asset 附加。
+4. 自动创建 GitHub Release，并把三个产物作为 Release assets 附加。
 
 ## 构建脚本
 
