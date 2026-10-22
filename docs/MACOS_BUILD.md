@@ -1,11 +1,10 @@
 # macOS DMG 构建说明
 
-Release 工作流会生成：
+`build-release-assets` 工作流会生成：
 
 ```text
 AnythingMindmap-macos-<arch>.dmg
 AnythingMindmap-source-<tag>.zip
-AnythingMindmap-windows-x64.zip
 ```
 
 DMG 中包含：
