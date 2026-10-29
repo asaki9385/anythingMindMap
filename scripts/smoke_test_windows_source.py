@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def fail(message: str) -> None:
+    annotation = message[-7000:].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"::error title=Windows source bootstrap failure::{annotation}", flush=True)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         try:
