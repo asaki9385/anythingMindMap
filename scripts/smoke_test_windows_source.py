@@ -16,6 +16,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def fail(message: str) -> None:
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        try:
+            with open(summary, "a", encoding="utf-8") as handle:
+                handle.write("## Windows source bootstrap test failed\n\n")
+                handle.write("```text\n")
+                handle.write(message[-12000:])
+                handle.write("\n```\n")
+        except Exception:
+            pass
     raise SystemExit(f"WINDOWS SOURCE SMOKE TEST FAILED: {message}")
 
 
@@ -194,6 +204,14 @@ def main() -> int:
                         server.kill()
 
     print("WINDOWS SOURCE SMOKE TEST PASSED", flush=True)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        try:
+            with open(summary, "a", encoding="utf-8") as handle:
+                handle.write("## Windows source bootstrap test passed\n\n")
+                handle.write(f"- mode: `{args.mode}`\n- port: `{args.port}`\n")
+        except Exception:
+            pass
     return 0
 
 
