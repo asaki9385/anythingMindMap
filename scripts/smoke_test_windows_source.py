@@ -7,12 +7,19 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
 
 
 def fail(message: str) -> None:
@@ -105,6 +112,8 @@ def main() -> int:
                 env=env,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
+                encoding="utf-8",
+                errors="replace",
             )
 
             try:
@@ -170,6 +179,8 @@ def main() -> int:
                     env=runtime_env_for(test_root),
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
                 if probe.returncode != 0:
                     fail(
@@ -184,6 +195,8 @@ def main() -> int:
                     env=runtime_env_for(test_root),
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
                 if server_probe.returncode != 0:
                     fail(
