@@ -6,6 +6,7 @@
 - [统一配置中心](统一配置中心.md)：模型服务、MinerU、学科与增强范围。
 - [解析报告面板](解析报告面板.md)：解析报告的数据口径、接口与前端展示。
 - [macOS DMG 构建说明](MACOS_BUILD.md)：独立运行时、DMG 产物、冒烟测试与签名边界。
+- [Windows 构建与源码启动](WINDOWS_BUILD.md)：首次启动自动安装、便携包与 Windows CI。
 
 更深层的解析与结构实现说明位于 [`knowledge-compiler/docs/`](../knowledge-compiler/docs/)。
 

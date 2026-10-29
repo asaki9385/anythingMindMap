@@ -252,6 +252,24 @@ ReviewStore：passes / lapses / next_due
 - pip
 - 联网环境（调用模型、MinerU 和部分前端 CDN 资源）
 
+Windows 用户可以直接双击根目录 `start.bat`。如果电脑没有可用的 Python，
+启动器会自动下载并校验官方 Python 3.12.10，优先使用国内镜像，失败后回退官网。
+普通 Python 会在项目内创建 `.runtime\venv`；如果系统 Python 缺少 venv 或安装器
+无法创建项目内目录，会自动改用项目内的官方嵌入式 Python。
+
+首次启动会按 `requirements.txt` 的 SHA-256 安装或修复全部依赖，并优先使用
+清华、阿里云、华为云 PyPI 镜像。环境准备完成后才会启动服务。整个过程不需要
+管理员权限，也不会修改系统 PATH；但首次启动必须联网，项目目录必须可写。
+
+失败原因的详细日志位于：
+
+```text
+.runtime\bootstrap\bootstrap.log
+```
+
+Windows 用户的完整操作说明见：
+`【Windows用户必看】双击start.bat启动.txt`。
+
 ### 安装依赖
 
 ```bash
@@ -311,8 +329,9 @@ start.command
 python -m uvicorn knowledge-compiler.server:app --host 127.0.0.1 --port 8000
 ```
 
-`start.bat` 与 `start.command` 都会在完成依赖检查后调用同一个 `start.py`，
-因此端口、健康检查、浏览器打开和退出行为保持一致。
+`start.bat` 会先运行 Windows bootstrap，完成 Python、venv 和依赖准备后再调用
+`start.py`；`start.command` 会执行轻量依赖检查后调用同一个 `start.py`。
+两者最终共用端口、健康检查、浏览器打开和退出逻辑。
 
 浏览器访问：
 
@@ -460,13 +479,14 @@ mindmap/
 ├── start.py                         # 启动入口
 ├── start.bat                        # Windows 启动脚本
 ├── start.command                    # macOS 启动脚本
+├── 【Windows用户必看】双击start.bat启动.txt
 ├── requirements.txt                 # Python 依赖
 ├── .env.example                     # 环境变量示例
 ├── README.md
 ├── AGENTS.md                        # 仓库级开发约定
 ├── .github/                         # GitHub Actions 发布工作流
 │
-├── scripts/                         # Windows 便携包构建与冒烟测试
+├── scripts/                         # Windows bootstrap、便携包构建与冒烟测试
 ├── packaging/                       # 便携包启动器与说明
 │
 ├── knowledge-compiler/              # 主应用
@@ -614,6 +634,14 @@ python test_six_fixes.py
 python test_image_refs.py
 python test_document_title.py
 python test_library_packages.py
+```
+
+Windows 首次启动与 bootstrap：
+
+```powershell
+./scripts/test_windows_bootstrap.ps1
+python scripts/smoke_test_windows_source.py --mode auto --port 8765
+python scripts/smoke_test_windows_source.py --mode embedded --port 8766
 ```
 
 全链路深度回归（结构层改动后建议运行）：

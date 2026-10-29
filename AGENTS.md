@@ -14,6 +14,20 @@ python start.py         # starts server at http://localhost:8000
 
 Windows: `start.bat`. macOS: `start.command`.
 
+Windows source startup auto-detects Python 3.10+. If none is available, it
+downloads and verifies official Python 3.12.10 from domestic mirrors with an
+official fallback, installs it under `.runtime/`, creates `.runtime/venv`,
+installs `requirements.txt` through domestic PyPI mirrors with an official
+fallback, and then starts the app. If a registered Windows Python installation
+prevents the official installer from creating `.runtime/python`, the launcher
+must fall back to the official embeddable Python ZIP plus the pinned pip wheel.
+Record startup failures in `.runtime/bootstrap/bootstrap.log` and keep the
+user-facing explanation in Chinese. The source launcher requires network access
+and a writable project directory on first run; do not require administrator
+rights or modify the system PATH.
+
+Windows 用户完整操作说明：`【Windows用户必看】双击start.bat启动.txt`。
+
 ## Architecture
 
 ```
@@ -78,6 +92,10 @@ Standalone test scripts (no pytest config):
 ```bash
 python test_document_processing.py
 python test_advanced_processing.py
+# Windows PowerShell 5.1+
+./scripts/test_windows_bootstrap.ps1
+python scripts/smoke_test_windows_source.py --mode auto --port 8765
+python scripts/smoke_test_windows_source.py --mode embedded --port 8766
 cd knowledge-compiler
 python test_all_numbering.py
 python test_app_settings.py

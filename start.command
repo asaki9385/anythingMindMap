@@ -13,7 +13,7 @@ if [ ! -f ".deps_installed" ]; then
 fi
 
 # requirements 变更后 .deps_installed 仍可能存在；每次启动做一次轻量导入检查。
-if ! python3 -c "import fastapi, uvicorn, fitz, httpx, requests, multipart, docx, chardet" 2>/dev/null; then
+if ! python3 -c "import fastapi, uvicorn, pymupdf, httpx, requests, multipart, docx, chardet" 2>/dev/null; then
     echo "Installing missing dependencies..."
     python3 -m pip install -r requirements.txt --quiet
 fi

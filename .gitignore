@@ -40,6 +40,7 @@ all_source_code.txt
 dist/
 *.zip
 .deps_installed
+.runtime/
 
 # Presentation/demo build artifacts (not part of the runtime package)
 .deck-build/

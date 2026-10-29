@@ -3,6 +3,8 @@ name: build-windows-portable
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -29,6 +31,18 @@ jobs:
           architecture: "x64"
           cache: "pip"
           cache-dependency-path: requirements.txt
+
+      - name: Test Windows bootstrap policy
+        shell: pwsh
+        run: ./scripts/test_windows_bootstrap.ps1
+
+      - name: "First run start.bat (auto: system Python / venv / installer fallback)"
+        shell: pwsh
+        run: python scripts/smoke_test_windows_source.py --mode auto --port 8765
+
+      - name: First run start.bat (embedded Python fallback)
+        shell: pwsh
+        run: python scripts/smoke_test_windows_source.py --mode embedded --port 8766
 
       - name: Build runtime-only portable ZIP
         shell: pwsh

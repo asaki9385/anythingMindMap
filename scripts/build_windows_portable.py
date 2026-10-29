@@ -200,7 +200,7 @@ def verify_staged_app(stage: Path, packaged_python: Path | None) -> None:
         [
             packaged_python,
             "-c",
-            "import fastapi, uvicorn, fitz, httpx, requests, multipart, docx, chardet",
+            "import fastapi, uvicorn, pymupdf, httpx, requests, multipart, docx, chardet",
         ],
         cwd=app_dir,
     )

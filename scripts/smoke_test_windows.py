@@ -92,7 +92,7 @@ def main() -> int:
             [
                 str(runtime_python),
                 "-c",
-                "import fastapi, uvicorn, fitz, httpx, requests, multipart, docx, chardet",
+                "import fastapi, uvicorn, pymupdf, httpx, requests, multipart, docx, chardet",
             ],
             cwd=str(app_dir),
             env=runtime_env,
