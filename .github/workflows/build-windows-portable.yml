@@ -33,8 +33,8 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Test Windows bootstrap policy
-        shell: pwsh
-        run: ./scripts/test_windows_bootstrap.ps1
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\scripts\test_windows_bootstrap.ps1"
 
       - name: "First run start.bat (auto: system Python / venv / installer fallback)"
         shell: pwsh
