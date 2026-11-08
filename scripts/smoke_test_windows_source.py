@@ -99,10 +99,16 @@ def main() -> int:
         if args.mode == "embedded":
             env["MINDMAP_FORCE_EMBEDDED_PYTHON"] = "1"
         else:
-            # 不预设，走和用户双击 start.bat 完全相同的决策路径。
+            # CI can pin the interpreter provisioned by setup-python while still
+            # exercising the launcher's venv/dependency path. Without this, a
+            # newer Python preinstalled on the runner can win version sorting and
+            # make the smoke test depend on packages outside our support matrix.
+            test_python = (env.get("MINDMAP_TEST_PYTHON") or "").strip()
             env.pop("MINDMAP_FORCE_EMBEDDED_PYTHON", None)
             env.pop("MINDMAP_FORCE_LOCAL_PYTHON", None)
             env.pop("MINDMAP_PYTHON", None)
+            if test_python:
+                env["MINDMAP_PYTHON"] = test_python
 
         server = None
         with log_path.open("w", encoding="utf-8", errors="replace") as log_file:
