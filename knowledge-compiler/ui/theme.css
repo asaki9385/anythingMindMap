@@ -6,7 +6,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  /* ── CDS-backed aliases (open-claude-ui) ── */
+  /* ── Shared CDS-backed aliases ── */
   --canvas: var(--cds-surface-0, #f9f9f7);
   --surface: var(--cds-surface-2, #ffffff);
   --surface-raised: var(--cds-surface-3, #f7f7f5);
@@ -45,9 +45,9 @@
   --level-5: #c77b5d;
 
   /* ── Typography ── */
-  --font-serif: var(--font-anthropic-serif, "Songti SC", "STSong", Georgia, serif);
-  --font-sans: var(--font-anthropic-sans, "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif);
-  --font-mono: var(--font-anthropic-mono, "SFMono-Regular", Menlo, monospace);
+  --font-serif: var(--font-cds-serif, "Songti SC", "STSong", Georgia, serif);
+  --font-sans: var(--font-cds-sans, "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif);
+  --font-mono: var(--font-cds-mono, "SFMono-Regular", Menlo, monospace);
 
   --text-xs: 11px;
   --text-sm: 12px;

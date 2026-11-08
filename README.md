@@ -28,6 +28,9 @@
 - **PDF 文本提取**：MinerU 云端 OCR，失败时自动回退 PyMuPDF 本地提取
 - **大体量 PDF 拆分**：超过 200MB 才按目录、内容检测或固定页数拆分；普通 PDF 整本处理
 - **结构质量路由**：根据标题、编号体系和层级线索，自动选择 regex 解析或 AI 骨架两条建树路线
+- **原文保真审计**：段落召回 / 字符覆盖 / 标题召回 / 顺序保真 / 结构一致 / AI 接地率，随解析报告落盘并展示
+- **编号画像与自适应**：从文档样本推断编号族顺序、重启作用域与未知族（第X讲/单元/课/专题/篇、罗马、字母、㉑+），驱动全篇编排
+- **骨架质量闭环**：AI 骨架严格契约（全覆盖/不重叠/顺序/深度/标题接地）+ 长文窗口拼接 + 无模型确定性骨架 + 质量分
 - **原文保真**：AI 骨架只决定标题层级和段落归属，正文由程序按原文锚定，不改写、不丢段
 - **结构前置层**：解析前恢复丢失标题、剔除重复页眉、补全章名；建树后校验并补缺失边界占位
 - **层级修复与归属审校**：多编号体系识别、章节顺序修正、跨主题错位节点回迁
@@ -36,9 +39,11 @@
 - **AI 增强**：摘要、关键词、考点、Mermaid 流程图、表格；支持快速 / 标准 / 全量三档范围
 - **章节导学**：生成全书导学、逐章导学和前置章节建议
 - **解析报告**：节点规模、AI 覆盖率、token 用量、文件页数、结构路由、审校与骨架报告
+- **解析完成弹窗**：解析完成后自动弹出数据面板，集中展示原文覆盖、段落/标题/顺序保真、编号画像、骨架质量、AI 解读与 token
 - **资料导览**：全书导学、学习路径、模块目录、复习进度
-- **交互式思维导图**：ECharts 渲染，支持拖拽、缩放、搜索、章节定位、展开/折叠、节点详情、左右平衡 / 全部从左到右 / 全部从右到左 / 上下 / 下上排列和朝向父节点的定位点；单册资料的包装层会自动提升为项目根，节点展开/收起后连接线与双翼根节点同步重排，大图下限制画布像素比以降低渲染成本
-- **一致的导览 / 导图切换**：切换器常驻客户端外壳，两个视图位置与样式一致；滑块动画结束后再切换 iframe
+- **交互式思维导图**：Mind Elixir 6 渲染（DOM 节点 + SVG 连线），工具条按「章节·搜索 / 缩放 / 视图·导出 / 编辑」分组，缩放为胶囊轨道；支持拖拽换父/排序、撤销重做、键盘导航、全字段搜索（标题/摘要/关键词/考点/正文）、聚焦+上下文、章节/大纲、小地图、展开层级、视图记忆；单册资料包装层自动提升，大图默认展开到章级
+- **节点内容编辑**：编辑模式下详情面板即节点检视器，名称、摘要、关键词、原文、笔记就地改写并自动保存；一次编辑一条撤销记录（含正文），根标题保持只读；入口为右键菜单、编辑浮条「内容」以及双击 / F2 改名
+- **一致的导览 / 导图切换**：切换器固定在客户端外壳的 44px 宿主条内（位于 iframe 之上、不叠加画布），两个视图位置与样式一致；滑块动画结束后再切换 iframe
 - **对话复习**：追问模式（AI 出题、静默判分）与学习模式（基于原文的自由问答）
 - **长期复习调度**：记录过关次数、遗忘次数和下次到期时间，支持今日复练和薄弱点队列
 - **对话内资料切换**：AI 对话页可直接切换当前文档，不离开对话页即可刷新引用、相关知识点和上下文
@@ -169,14 +174,14 @@ regex 路线的主要顺序：
 
 导图页支持：
 
-- 导出当前视图 PNG
+- 导出整图 PNG（Mind Elixir + export-mindmap，无 watermark）
 - 打印当前视图讲义
 - 打印全书讲义
 - 导出 Markdown 大纲
 - 导出 Anki 可导入的复习卡 CSV
 - 通过后端导出 ZIP 数据包
 
-ZIP 包含离线 `mindmap.html`、`cds-theme.css`、`theme.css`、`common.js`、Markdown 和 JSON。图表库仍从 CDN 加载，首次打开需要网络；如果需要完全离线，需要把 ECharts、GSAP、KaTeX、Mermaid 等前端资源一起本地化。
+ZIP 包含离线 `mindmap.html`、地图模块、Mind Elixir vendor 资源、主题 CSS、Markdown 和 JSON；知识树直接内嵌在 HTML 中，因此可以直接用 `file://` 打开为只读导图（KaTeX / Mermaid 仍从 CDN 加载，首次打开需要网络）。
 
 ### 2. 学习复习链
 
@@ -238,7 +243,8 @@ ReviewStore：passes / lapses / next_due
 | Word / TXT | python-docx、chardet |
 | AI 服务 | OpenAI chat-completions 兼容端点（DeepSeek、OpenCode 等） |
 | 前端 | 原生 HTML / CSS / JS + CDS 设计令牌，无构建步骤 |
-| 图表与动画 | ECharts、GSAP、KaTeX、Mermaid（CDN） |
+| 导图引擎 | Mind Elixir 6（本地 vendored，MIT） |
+| 图表与动画 | GSAP、KaTeX、Mermaid（CDN） |
 | 对话富文本 | 轻量 Markdown 渲染 + KaTeX 后处理 + 表格 / 列表样式 |
 | 进度 | 前端轮询；SSE 接口保留 |
 | 存储 | 本地 JSON 文件，无数据库 |
@@ -350,7 +356,7 @@ http://localhost:8000
 | 首页 | `#home` | 居中“构建你的导图”、`Start` 进入解析、`概况` 右侧抽屉；`knowledge-compiler/ui/assets/bg1.png` / `bg1-dark.png` 随主题交叉淡入 |
 | 解析 | `#parse` | 拖放上传、统一配置摘要、处理进度与解析报告；不再逐页询问模型 / OCR |
 | 资料 | `#library` | 已完成知识树、未完成任务、导入数据包、收藏 / 删除、搜索筛选与跨场景入口 |
-| 导图 | `#mindmap?file=...` | 导览 / 导图共享切换器、可折叠大纲、平衡双翼 ECharts 导图、搜索与导出 |
+| 导图 | `#mindmap?file=...` | 宿主条内的导览 / 导图切换、可折叠大纲、Mind Elixir 知识地图（分组工具条 / 浮动岛）、搜索、内容编辑与导出 |
 | AI 对话 | `#chat?file=...` | 学习 / 追问模式、当前文档切换、可折叠左右栏、引用来源与富文本回答 |
 | 设置 | 右侧抽屉 | 模型服务、MinerU、学科、增强范围 |
 
@@ -365,8 +371,10 @@ http://localhost:8000
 ### 界面与交互约定
 
 - **设计系统**：组件样式与动效以 `ui/cds-theme.css` 的 CDS 令牌为准；实现保持现有 Warm Academic 视觉与交互基准。
-- **共享视图切换**：导览 / 导图切换器由 `client.html` 外壳统一渲染，两个视图使用同一个 DOM、同一位置和同一套样式；切换时滑块先完成动画，再替换 iframe 内容。
+- **共享视图切换**：导览 / 导图切换器由 `client.html` 外壳统一渲染，放在 iframe 上方的 44px 宿主条（`.preview-frame-bar`）里，两个视图共用同一个 DOM、位置与样式；切换时滑块先完成动画，再替换 iframe 内容。切换器不再绝对定位盖在画布上。
 - **沉浸式导图**：主节点居中，章节分成左右两翼；左翼节点定位点在文字右侧，右翼定位点在文字左侧，上下布局同理。另提供“全部从左到右 / 全部从右到左”单向排列。单册资料会把“项目根 → 源文件”包装层提升为项目根，章节直接挂在项目根下。两翼的拖拽、缩放、展开/收起重排和根节点对齐保持同步，连接线随可见节点一起更新；Retina 屏幕上 canvas 像素比上限为 2x，避免 4x 像素量拖慢大图操作。
+- **导图页工具条**：独立访问时页头拆成标识行（品牌 / 标题 / 设置 / 主题）与工具行；嵌入客户端时整条页头隐藏，工具行变成画布底部居中的浮岛（surface-popover + 16px 圆角），菜单向上弹出。控件统一 32px 高 / 8px 圆角 / ghost 底，只有编辑中的「完成」是实心主操作；画布上的「居中」按实测浮岛高度让位，避免被浮岛或详情面板遮挡。
+- **节点内容编辑**：编辑模式下详情面板即检视器——名称（单行）、摘要、关键词（chip 增删）、原文、笔记都可就地修改，600ms 防抖 + 失焦提交，带输入法守卫；改动经引擎 `reshapeNode`，一次编辑一条撤销记录，正文编辑的旧值会同时写进历史快照，Ctrl+Z 可以还原；根标题只能在资料库重命名。
 - **可折叠面板**：导图大纲、AI 对话左侧导航和右侧知识库支持收起 / 展开；收起后主内容平滑居中，并保留 `aria-expanded`、焦点转移和折叠状态。
 - **AI 对话富文本**：回答支持 Markdown 列表、嵌套列表、表格、行内 / 独立公式和代码块；公式由 KaTeX 在消息插入 DOM 后渲染，流式输出期间也会持续更新。
 - **对话内文档切换**：当前文档卡片展开后直接在对话页切换资料，不跳转资源库；顶栏、左侧知识库、引用来源和对话上下文同步更新。
@@ -383,6 +391,8 @@ http://localhost:8000
 | `/api/status/{task_id}` | GET | 查询任务状态、阶段、进度和最近消息 |
 | `/api/status/{task_id}/stream` | GET | SSE 进度接口；当前解析场景使用轮询，尚未接入此接口 |
 | `/api/result/{task_id}` | GET | 获取最终知识树 JSON |
+| `/api/tree/{key}` | GET | 导图页加载：树 + `rev` + 节点数；处理中返回 202 |
+| `/api/tree/save` | POST | 保存策展编辑：`base_rev` 冲突检测、按 id 合并、备份、同步任务/缓存 |
 | `/api/report/{task_id}` | GET | 获取解析报告 |
 | `/api/export/{task_id}` | GET | 导出离线导图 HTML + Markdown / JSON ZIP 数据包 |
 | `/api/files` | GET | 列出已完成任务和历史树文件 |
@@ -515,11 +525,18 @@ mindmap/
 │       ├── client.css               # 客户端布局、CDS 主题与响应式样式
 │       ├── client.js                # 场景路由、活动资料、上传与跨场景交互
 │       ├── client-embed.css         # iframe 嵌入式页面共享 CDS 样式 / Hub Rail
-│       ├── claude-pages.css         # 导览页、导图页的 CDS 画布样式
+│       ├── cds-pages.css            # 导览页、导图页的共享画布样式
 │       ├── cds-theme.css            # CDS 令牌与动效
 │       ├── embed-mode.js            # iframe embed 模式标记
 │       ├── overview.html            # 资料导览
-│       ├── tree_mindmap.html        # 平衡双翼思维导图
+│       ├── tree_mindmap.html        # 知识地图页面壳（数据加载/工具栏/详情/导出）
+│       ├── knowledge_map.css        # 地图视觉、工具条 / 浮岛、节点、搜索、小地图、编辑面板
+│       ├── map/
+│       │   ├── map_adapter.js       # 知识树 ⇄ Mind Elixir 纯数据适配
+│       │   ├── knowledge_map.js     # KTMap 控制器（引擎/选中/搜索/聚焦/编辑/持久化）
+│       │   └── map_exports.js       # 讲义 / Markdown / Anki / PNG / 数据包
+│       ├── vendor/mind-elixir/      # vendored Mind Elixir IIFE + CSS + LICENSE
+│       ├── vendor/export-mindmap/   # vendored PNG 导出 UMD
 │       ├── settings.html            # 设置
 │       ├── review_widget.js         # 对话复习、流式消息与 Markdown / KaTeX 渲染
 │       ├── common.js                # 共享工具、Markdown/表格/公式后处理
@@ -532,16 +549,9 @@ mindmap/
 └── _archive/                        # 本地历史归档（gitignored，不参与运行）
 ```
 
-### 归档与干净拷贝
+### 干净拷贝
 
-`_archive/` 只保留本机历史资料，并已加入 `.gitignore`。当前有两个归档批次：
-
-| 目录 | 内容 |
-| --- | --- |
-| `2026-10-20-cleanup/` | 旧版页面、早期设计走查、UI 快照、外部 CDS 参考仓库与开发期脚本 |
-| `2026-10-22-github-cleanup/` | 演示视频工程、Remotion/PPT 构建产物、演示脚本、历史实施记录与测试报告 |
-
-干净拷贝时排除归档区、本机运行数据和本机配置：
+干净拷贝时排除本机归档、运行数据和开发配置：
 
 ```bash
 rsync -a \
@@ -551,11 +561,10 @@ rsync -a \
   --exclude '__pycache__/' \
   --exclude 'node_modules/' \
   --exclude '.DS_Store' \
-  --exclude '.claude/' \
   ./ /path/to/clean-copy/
 ```
 
-`scripts/build_windows_portable.py` 已内置运行文件白名单，可作为打包范围的权威参照。确认归档内容不再需要后，可直接删除整个 `_archive/`。
+`scripts/build_windows_portable.py` 已内置运行文件白名单，可作为打包范围的权威参照。
 
 ### 文档
 
@@ -658,24 +667,30 @@ JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_client.js
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_composer.js
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_lightbox.js
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_mindmap.js
+JSDOM_PATH=/path/to/node_modules/jsdom node test_map_controller.js
+JSDOM_PATH=/path/to/node_modules/jsdom node test_map_exports.js
+JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_map_sync.js
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_overview.js
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_settings.js
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_image_refs.js
+node test_map_adapter.js
+python test_tree_save.py
+python test_offline_map.py
 ```
 
-当前前端 jsdom 回归基线：7 个测试文件、428 项全部通过。覆盖统一客户端场景与资料库操作、导图双翼 / 单向排列与展开收起后的连接线重排、设置、导览学习路径、富文本 composer、图片引用和灯箱。资料库 API 另有 `test_library_packages.py` 的收藏 / 导入 / 导出 / 删除回归测试。
+当前前端 jsdom 回归基线：10 个测试文件、352 项全部通过（另 `test_map_adapter.js` 14 项纯数据测试，合计 366 项）。覆盖统一客户端场景与资料库操作、导图四种排列方向、编辑保存/撤销、小地图几何与定位、节点编辑面板（改名 / 正文 / 清空 / 撤销）、讲义/Markdown/Anki/PNG 导出、壳层与地图 postMessage 同步、设置、导览学习路径、富文本 composer、图片引用和灯箱。服务端另有 `test_tree_save.py`（保存/冲突/备份/任务状态）与 `test_offline_map.py`（离线树内嵌/资源清单）。
 
-大体积导图本机实测：`外国教育史`（1,591 节点）、`333中国教育史·完整版`（1,036 节点）、`教育学原理·完整解析版`（1,014 节点）均可正常加载、平衡排布、缩放、平移和展开/收起；1,591 节点全部展开的同步重排约 172ms，缩放交互约 2ms。
+大体积导图本机实测（Chrome）：1,603 节点默认展开章级 7 个可见节点；全部展开约 60–90ms，收起约 90ms，搜索约 6–10ms。
 
 ## 当前实现说明与已知限制
 
 1. **普通 PDF 不会拆分**：只有大于 200MB 才触发 PDF 拆分；小文件整本处理。
 2. **解析场景使用轮询**：`/api/status/{task_id}/stream` 存在，但当前解析场景没有调用 SSE。
 3. **任务运行态仍以内存为主**：`task_state.json` 会持久化阶段/进度/错误，服务重启后遗留 `processing` 会标为中断；但正在执行的线程不会自动续跑。
-4. **节点编辑只更新树 JSON**：`task_<task_id>` 已支持，但编辑后不会自动重算解析报告、导学、复习单元或缓存元数据；需要时重新跑一遍管线。
+4. **节点编辑只更新树 JSON**：`/api/tree/save` 支持 `base_rev` 冲突检测、备份、按 id 合并并同步任务/缓存；但不会自动重算解析报告、导学、复习单元或保真度数据（解析报告是解析时快照）。编辑模式可改名称 / 摘要 / 关键词 / 原文 / 笔记，根标题只能在资料库重命名；重命名、移动或删除节点仍可能让该节点的复习单元失去关联（进入编辑时会提示）。
 5. **默认未配置凭证**：模型服务与 MinerU Token 留空时，系统按降级策略运行；需要 AI 功能时请在设置页或环境变量中配置。
 6. **默认无鉴权但只监听本机**：局域网/公网部署请设置 `KT_AUTH_PASSWORD`，并配置 `CORS_ORIGINS`、HTTPS 和反向代理。
-7. **部分前端库依赖 CDN**：ECharts、GSAP、KaTeX、Mermaid 和 Google Fonts 从 CDN 加载；KaTeX 未加载时公式会保留原文，但列表和表格仍由本地渲染器处理。导出包也不是完全离线，首次打开需要网络。
+7. **部分前端库依赖 CDN**：GSAP、KaTeX、Mermaid 和 Google Fonts 从 CDN 加载；导图引擎与 PNG 导出已本地 vendored。KaTeX 未加载时公式会保留原文，但列表和表格仍由本地渲染器处理；Mermaid 在需要时懒加载。离线包的知识树已内嵌，可用 `file://` 打开，但 KaTeX / Mermaid 首次仍需要网络。
 8. **缓存有版本边界**：修改解析/增强语义后应提升 `CACHE_VERSION`，否则相同输入可能继续命中旧结果。
 9. **导学投影修复只对新处理资料生效**：旧任务树里已经生成在包装节点上的导学不会自动迁移；需要重新解析一次。
 10. **图片只保留引用、不渲染**：MinerU 的 `images/<hash>` 会从正文移到节点的 `images` 元数据，不再显示路径；当前版本没有图片资产服务，因此图片本身不会显示。
@@ -715,4 +730,4 @@ KT_SETTINGS_PATH=/path/to/settings.json
 
 ## License
 
-MIT
+MIT. Third-party attributions are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

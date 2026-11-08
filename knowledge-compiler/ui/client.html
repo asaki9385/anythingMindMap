@@ -7,17 +7,17 @@
 <meta name="theme-color" content="#f9f9f7">
 <title>AnythingMindmap · 知识工作台</title>
 <script>try{if(localStorage.getItem("kt-theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");document.documentElement.setAttribute("data-mode","dark");}}catch(e){}</script>
-<link rel="stylesheet" href="cds-theme.css?v=2">
+<link rel="stylesheet" href="cds-theme.css?v=4">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-<link rel="stylesheet" href="client.css?v=17">
+<link rel="stylesheet" href="client.css?v=22">
 </head>
 <body data-scene="home">
 <a class="skip-link" href="#sceneRoot">跳到主要内容</a>
 
 <div class="client-shell">
-  <header class="client-topbar" data-cds="ClaudeDesktopHeader">
+  <header class="client-topbar" data-cds="DesktopHeader">
     <div class="topbar-left">
       <a class="brand" href="#home" data-scene-link="home" aria-label="AnythingMindmap 首页">
       <span class="brand-mark" aria-hidden="true">
@@ -310,11 +310,18 @@
               <span></span>
             </div>
             <div class="preview-frame-pane" id="previewFramePane">
-              <div class="preview-view-switch" id="previewViewSwitch" hidden>
-                <div class="view-switch-rail" id="previewViewRail" role="tablist" aria-label="资料视图">
-                  <span class="view-switch-thumb" id="previewViewThumb" aria-hidden="true"></span>
-                  <button class="view-switch-item is-active" type="button" role="tab" data-preview-view="overview" aria-selected="true" tabindex="0"><span data-icon="menu"></span><span>导览</span></button>
-                  <button class="view-switch-item" type="button" role="tab" data-preview-view="canvas" aria-selected="false" tabindex="-1"><span data-icon="tree"></span><span>导图</span></button>
+              <div class="preview-frame-bar" id="previewFrameBar">
+                <div class="preview-view-switch" id="previewViewSwitch" hidden>
+                  <div class="view-switch-rail" id="previewViewRail" role="tablist" aria-label="资料视图">
+                    <span class="view-switch-thumb" id="previewViewThumb" aria-hidden="true"></span>
+                    <button class="view-switch-item is-active" type="button" role="tab" data-preview-view="overview" aria-selected="true" tabindex="0"><span data-icon="menu"></span><span>导览</span></button>
+                    <button class="view-switch-item" type="button" role="tab" data-preview-view="canvas" aria-selected="false" tabindex="-1"><span data-icon="tree"></span><span>导图</span></button>
+                  </div>
+                </div>
+                <span class="preview-frame-bar-title" id="previewFrameBarTitle"></span>
+                <div class="preview-frame-bar-actions">
+                  <button class="btn btn-ghost btn-sm" type="button" id="frameOpenFullBtn" title="新窗口" aria-label="新窗口"><span data-icon="external"></span><span class="preview-frame-bar-label">新窗口</span></button>
+                  <button class="btn btn-soft btn-sm" type="button" id="frameChatBtn" title="AI 对话" aria-label="AI 对话"><span data-icon="message"></span><span class="preview-frame-bar-label">AI 对话</span></button>
                 </div>
               </div>
               <button class="preview-side-expand" id="previewSideExpand" type="button" title="展开资料上下文" aria-label="展开资料上下文"><span data-icon="chevronRight"></span></button>
@@ -551,10 +558,32 @@
   <div class="drawer-body"><iframe id="settingsFrame" title="统一设置"></iframe></div>
 </aside>
 
+<div class="result-modal-backdrop" id="resultModalBackdrop" hidden></div>
+<section class="result-modal" id="resultModal" data-cds="Dialog" role="dialog" aria-modal="true" aria-labelledby="resultModalTitle" aria-describedby="resultModalSubtitle" hidden>
+  <header class="result-modal-head">
+    <div class="result-modal-hero">
+      <span class="result-check"><span data-icon="check"></span></span>
+      <div>
+        <span class="section-kicker">ANALYSIS COMPLETE</span>
+        <h2 id="resultModalTitle">解析完成</h2>
+        <p id="resultModalSubtitle">原文保真、编号体系与骨架质量已汇总。</p>
+      </div>
+    </div>
+    <button class="icon-btn compact" type="button" id="resultModalClose" aria-label="关闭解析报告"><span data-icon="close"></span></button>
+  </header>
+  <div class="result-modal-body" id="resultModalBody"></div>
+  <footer class="result-modal-actions">
+    <span class="rm-hint">Esc 关闭</span>
+    <button class="btn btn-ghost" type="button" id="resultModalLaterBtn">稍后</button>
+    <button class="btn btn-secondary" type="button" id="resultModalOverviewBtn"><span data-icon="eye"></span>查看导览</button>
+    <button class="btn btn-primary" type="button" id="resultModalMindmapBtn"><span data-icon="tree"></span>打开导图</button>
+  </footer>
+</section>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="common.js?v=7"></script>
-<script src="review_widget.js?v=29"></script>
-<script src="client.js?v=12"></script>
+<script src="common.js?v=8"></script>
+<script src="review_widget.js?v=30"></script>
+<script src="client.js?v=18"></script>
 </body>
 </html>

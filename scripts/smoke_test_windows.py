@@ -69,7 +69,7 @@ def main() -> int:
             if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}:
                 fail(f"bytecode/cache leaked into package: {path.relative_to(package_root)}")
             relative = str(path.relative_to(package_root))
-            if any(token in relative for token in (".deck-", "open-claude-ui-main", "_archive", "design-qa.md")):
+            if any(token in relative for token in (".deck-", "_archive", "design-qa.md")):
                 fail(f"non-runtime asset leaked into package: {relative}")
 
         settings_text = (package_root / "app" / "knowledge-compiler" / "app_settings.py").read_text(

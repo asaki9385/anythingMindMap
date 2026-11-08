@@ -56,8 +56,17 @@ FAVORITES_PATH = os.path.join(BASE_DIR, "data", "favorites.json")
 # 内容级缓存：相同文件 + 相同模型/OCR 设置 + 相同管线版本时复用最终结果。
 CACHE_DIR = os.path.join(BASE_DIR, "data", "_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
-CACHE_VERSION = "2026-10-17-v1"
+CACHE_VERSION = "2026-11-04-a1"
 cache_lock = threading.Lock()
+# Serialize whole-tree writes from the map editor. Node edits and saves must not
+# interleave with /api/rename or another tab.
+tree_write_lock = threading.Lock()
+
+TREE_MAX_NODES = 20000
+TREE_MAX_DEPTH = 30
+TREE_MAX_TITLE = 500
+TREE_MAX_BYTES = 10 * 1024 * 1024
+TREE_BACKUP_KEEP = 20
 
 # AI Enhancement config
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -184,6 +193,9 @@ class TaskProgress:
         self.ai_meta = None          # 增强阶段：模型、目标/成功/兜底节点数
         self.audit_meta = None       # 结构审校报告
         self.skeleton_meta = None    # 骨架恢复/校验报告（解析前置 + 增强前置）
+        self.fidelity_meta = None    # 原文保真度审计（段落/字符/标题/顺序）
+        self.numbering_meta = None   # 编号画像（族顺序/重启/未知族）
+        self.skeleton_quality_meta = None  # AI/确定性骨架质量汇总
         self.structure_judgements = []   # 片段级结构判断（每片段走 regex 还是 AI 骨架）
         self.cache_key = ""
         self.cache_hit = False
@@ -334,6 +346,9 @@ def _copy_result_dirs(src_dir: str, dst_dir: str) -> None:
     report_src = os.path.join(src_dir, "report.json")
     if os.path.isfile(report_src):
         shutil.copy2(report_src, os.path.join(dst_dir, "report.json"))
+    fidelity_src = os.path.join(src_dir, "fidelity.json")
+    if os.path.isfile(fidelity_src):
+        shutil.copy2(fidelity_src, os.path.join(dst_dir, "fidelity.json"))
 
 
 def _store_cache(cache_key: str, work_dir: str) -> None:
@@ -468,6 +483,22 @@ def _update_cached_tree(cache_key: str, tree: dict) -> None:
 # Pipeline functions
 # ────────────────────────────────────────────
 
+def _apply_numbering_config(profile: dict | None) -> dict | None:
+    """设置页的编号策略：off=不启用画像；manual=用用户顺序覆盖自动识别的 order。"""
+    try:
+        import app_settings
+        cfg = app_settings.numbering_config()
+    except Exception:
+        return profile
+    mode = cfg.get("mode") or "auto"
+    if mode == "off":
+        return None
+    if mode == "manual" and cfg.get("order"):
+        return {**(profile or {}), "order": list(cfg["order"]),
+                "effective": True, "confidence": 1.0, "source": "manual"}
+    return profile
+
+
 def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
     """Run the full pipeline in a background thread.
     Supports mixed file types: PDF, Word (.docx), and plain text (.txt).
@@ -586,10 +617,33 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
             except Exception:
                 regex_md_files.append(md_path)
                 continue
+            # 先做编号画像（前 N 行 + 全文投票），再做确定性大纲恢复与评分：
+            # 纯文本「第X节/知识点X/第X讲」不应因为缺少 # 标记被误判为
+            # 结构不良而送进 AI 骨架。
+            outline_report = {}
+            numbering_profile = {}
+            try:
+                from numbering_profile import probe_numbering_profile
+                numbering_profile = probe_numbering_profile(
+                    text, doc_hint=Path(md_path).stem)
+                numbering_profile = _apply_numbering_config(numbering_profile) or {}
+            except Exception as e:
+                print(f"  Numbering profile skipped for {Path(md_path).stem}: {e}")
+            try:
+                from outline_skeleton import normalize_markdown_outline
+                text, outline_report = normalize_markdown_outline(
+                    text, doc_hint=Path(md_path).stem,
+                    profile=numbering_profile or None)
+            except Exception as e:
+                print(f"  Outline normalization skipped for {Path(md_path).stem}: {e}")
             judged = score_fragment(text)
             structure_judgements.append(judged)
             unit = unit_meta_by_stem.get(Path(md_path).stem, {}) or {}
             unit["structure_quality"] = judged
+            unit["normalized_text"] = text
+            unit["outline_report"] = outline_report
+            unit["numbering_profile"] = numbering_profile
+            unit_meta_by_stem[Path(md_path).stem] = unit
             if judged["route"] == "skeleton":
                 skeleton_units.append({**unit, "path": md_path, "text": text})
             else:
@@ -605,22 +659,24 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
             task.messages.append(f"结构判断：{len(regex_md_files)} 个片段结构可还原，直接解析建树")
 
         llm_trees = []
+        skeleton_metas = []
         if skeleton_units:
             if not chat:
                 task.messages.append("未配置模型服务（设置页可配置），"
-                                     "结构不良片段改为按段落保留原文")
+                                     "结构不良片段改用编号/段落确定性骨架")
             task.set_stage("building_tree", 42,
                            f"正在为 {n_sk} 个结构不良片段生成骨架…")
             try:
-                llm_trees = asyncio.run(_skeleton_units_to_trees(skeleton_units, task, chat))
+                llm_trees, skeleton_metas = asyncio.run(
+                    _skeleton_units_to_trees(skeleton_units, task, chat))
             except Exception as e:
                 task.messages.append(f"WARNING: 骨架生成失败 ({e})，按段落保留原文")
                 llm_trees = [_fallback_unit_tree(u) for u in skeleton_units]
+                skeleton_metas = []
+            task.skeleton_quality_meta = _merge_skeleton_metas(skeleton_metas)
 
         # ── Stage 3: Build trees ──
         task.set_stage("building_tree", 45, "正在构建知识树...")
-        # All units (PDF + structured text) for metadata
-        unit_meta_by_stem = {Path(unit["path"]).stem: unit for unit in all_units}
         tree_files = _build_trees_from_md(regex_md_files, work_dir, unit_meta_by_stem,
                                           api_key=(chat or {}).get("api_key", ""))
 
@@ -652,9 +708,25 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
                     "source_order": src.get("source_order", 0),
                     "source_title": src.get("source_title", ""),
                     "unit_order": src.get("unit_order", 0),
+                    "numbering_profile": src.get("numbering_profile") or {},
+                    "route": "skeleton",
                 })
 
         task.set_stage("building_tree", 60, "知识树构建完成")
+
+        # 编号画像汇总：每个片段探测到的族顺序/重启/未知族，进解析报告。
+        try:
+            import numbering_profile as _np
+            task.numbering_meta = _np.merge_profiles(
+                [tf.get("numbering_profile") for tf in tree_files])
+            if task.numbering_meta:
+                task.messages.append(_np.profile_summary(task.numbering_meta))
+                for w in (task.numbering_meta.get("unknown") or [])[:5]:
+                    task.messages.append(
+                        f"未识别编号：{w.get('title', '')[:40]}")
+        except Exception as e:
+            task.numbering_meta = None
+            print(f"  Numbering profile merge skipped: {e}")
 
         # ── Stage 4: Fix hierarchy ──
         task.set_stage("building_tree", 65, "正在整理章节层级…")
@@ -688,6 +760,44 @@ def run_pipeline(task: TaskProgress, uploaded_files: list[dict]):
         # ── Stage 6: Done ──
         task.set_stage("merging", 98, "正在准备最终数据…")
         final_result = _prepare_final_json(enhanced_tree)
+
+        # ── 原文保真度审计 ──
+        # 用与建树同一份（已恢复大纲的）Markdown 对照最终树，给出段落召回、
+        # 字符覆盖、标题召回、顺序保真等指标。只读，失败不影响主流程。
+        try:
+            import fidelity
+            sources = []
+            for md_path in md_files:
+                stem = Path(md_path).stem
+                meta = unit_meta_by_stem.get(stem) or {}
+                text = meta.get("normalized_text")
+                if text is None:
+                    try:
+                        with open(md_path, encoding="utf-8") as _f:
+                            text = _f.read()
+                    except Exception:
+                        text = ""
+                sources.append({
+                    "name": os.path.basename(md_path),
+                    "text": text,
+                    "skeleton_report": meta.get("outline_report") or {},
+                })
+            task.fidelity_meta = fidelity.audit_final(sources, final_result)
+            with open(os.path.join(work_dir, "fidelity.json"), "w",
+                      encoding="utf-8") as _f:
+                json.dump(task.fidelity_meta, _f, ensure_ascii=False, indent=2)
+            fd = task.fidelity_meta
+            task.messages.append(
+                f"原文保真：段落 {fd['paragraph_recall']:.1%}，"
+                f"字符 {fd['char_coverage']:.1%}"
+                + (f"，标题 {fd['heading_recall']:.1%}"
+                   if fd.get("heading_recall") is not None else "")
+                + (f"，顺序 {fd['order_score']:.1%}"
+                   if fd.get("order_score") is not None else ""))
+        except Exception as e:
+            task.fidelity_meta = None
+            task.messages.append(f"原文保真审计跳过（{e}）")
+
         export_json_dir = os.path.join(work_dir, "json")
         os.makedirs(export_json_dir, exist_ok=True)
         with open(os.path.join(export_json_dir, "knowledge_tree.json"), "w", encoding="utf-8") as f:
@@ -746,6 +856,9 @@ def _compose_report(task: TaskProgress, tree: dict, uploaded_files: list[dict],
         ai=task.ai_meta or None,
         audit=task.audit_meta or None,
         skeleton=getattr(task, "skeleton_meta", None) or None,
+        fidelity=getattr(task, "fidelity_meta", None) or None,
+        numbering=getattr(task, "numbering_meta", None) or None,
+        skeleton_quality=getattr(task, "skeleton_quality_meta", None) or None,
         duration_sec=time.time() - started,
         generated_at=time.time(),
     )
@@ -758,6 +871,45 @@ def _save_report(work_dir: str, report: dict) -> None:
             json.dump(report, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"[报告] 落盘失败（不影响流程）: {e}")
+
+
+def _backfill_fidelity(report: dict, task_id: str) -> None:
+    """老任务的 report.json 没有 fidelity 时，用缓存目录现算一份。
+
+    只读原始 markdown + 最终树；算不出来就保持缺失（前端隐藏该区块），
+    绝不显示 0% 误导用户。
+    """
+    work_dir = os.path.join(TEMP_DIR, task_id)
+    tree_path = os.path.join(work_dir, "json", "knowledge_tree.json")
+    md_dir = os.path.join(work_dir, "markdown")
+    if not (os.path.isfile(tree_path) and os.path.isdir(md_dir)):
+        return
+    try:
+        import fidelity
+        with open(tree_path, encoding="utf-8") as f:
+            tree = json.load(f)
+        sources = []
+        for name in sorted(os.listdir(md_dir)):
+            if not name.endswith(".md"):
+                continue
+            with open(os.path.join(md_dir, name), encoding="utf-8") as f:
+                sources.append({"name": name, "text": f.read()})
+        if not sources:
+            return
+        report["fidelity"] = fidelity.audit_final(
+            sources, tree,
+            skeleton_reports=[report.get("skeleton") or {} for _ in sources])
+        report["fidelity"]["backfilled"] = True
+        if not report.get("numbering"):
+            try:
+                import numbering_profile as _np
+                profiles = [_np.probe_numbering_profile(
+                    s["text"], doc_hint=s.get("name", "")) for s in sources]
+                report["numbering"] = _np.merge_profiles(profiles)
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 def load_report(task_id: str) -> dict | None:
@@ -775,7 +927,10 @@ def load_report(task_id: str) -> dict | None:
     if os.path.isfile(path):
         try:
             with open(path, encoding="utf-8") as f:
-                return json.load(f)
+                report = json.load(f)
+            if isinstance(report, dict) and "fidelity" not in report:
+                _backfill_fidelity(report, task_id)
+            return report
         except Exception:
             pass
 
@@ -785,6 +940,7 @@ def load_report(task_id: str) -> dict | None:
             with open(tree_path, encoding="utf-8") as f:
                 tree = json.load(f)
             report = parse_report.build_report(tree, task_id=task_id)
+            _backfill_fidelity(report, task_id)
             report["partial"] = True      # 前端据此提示"仅有节点统计"
             return report
         except Exception:
@@ -1015,19 +1171,50 @@ def _fallback_unit_tree(unit: dict) -> dict:
             "children": root.get("children") or []}
 
 
+def _merge_skeleton_metas(metas: list[dict]) -> dict | None:
+    """把每个 skeleton unit 的质量元数据汇总成报告区块。"""
+    metas = [m for m in metas or [] if m]
+    if not metas:
+        return None
+    routes = {}
+    for m in metas:
+        r = m.get("route") or "prose_fallback"
+        routes[r] = routes.get(r, 0) + 1
+    scores = [float(m.get("score") or 0) for m in metas
+              if m.get("route") in ("ai", "deterministic")]
+    ungrounded = sum(len((m.get("grounding") or {}).get("ungrounded") or [])
+                     for m in metas)
+    return {
+        "units": len(metas),
+        "windows": sum(int(m.get("windows") or 0) for m in metas),
+        "attempts": sum(int(m.get("attempts") or 0) for m in metas),
+        "schema_failures": sum(int(m.get("schema_failures") or 0) for m in metas),
+        "avg_score": round(sum(scores) / len(scores), 3) if scores else 0.0,
+        "degraded": sum(1 for m in metas if m.get("route") != "ai"),
+        "ungrounded_titles": ungrounded,
+        "route_counts": routes,
+    }
+
+
 async def _skeleton_units_to_trees(units: list, task: TaskProgress,
-                                   chat: dict | None) -> list:
+                                   chat: dict | None) -> tuple:
     """对结构不可还原的片段：AI 只出骨架，原文由程序按区间锚定。
 
-    与旧 _llm_structure_chunks 的区别：模型不写 content（不改写正文），
-    因此不会有"改写丢字 / JSON 截断后只剩 10 段"的问题。无 API key 时
-    自动降级为按段落保留原文，绝不丢字。
+    与旧版的区别：
+      · 长片段多窗口生成 + 重叠拼接（不再只送前 120 段）；
+      · 骨架先过严格契约（全覆盖/不重叠/顺序/标题接地），失败带错误反馈重试；
+      · 无模型/骨架被拒时用确定性骨架（编号切边界），仍失败才段落保底；
+      · AI 树同样过 hierarchy_repair / audit_tree_skeleton，和 regex 树同一套治理。
     """
     import httpx
-    from skeleton_builder import fragment_to_tree, generate_skeleton
+    from skeleton_builder import fragment_to_tree, generate_skeleton_windows
     from content_anchor import split_paragraphs
+    import skeleton_quality as sq
+    from hierarchy_repair import apply_hierarchy_repair
+    from outline_skeleton import audit_tree_skeleton
 
     trees = []
+    metas = []
     api_key = (chat or {}).get("api_key", "")
     base_url = (chat or {}).get("base_url", "")
     model = (chat or {}).get("model", "")
@@ -1036,24 +1223,55 @@ async def _skeleton_units_to_trees(units: list, task: TaskProgress,
         for i, unit in enumerate(units):
             text = unit.get("text") or ""
             paras = split_paragraphs(text)
+            profile = unit.get("numbering_profile") or None
             skeleton = None
+            smeta = {"route": "prose_fallback", "windows": 0, "attempts": 0,
+                     "schema_failures": 0, "score": 0.0}
             if api_key and base_url and paras:
                 try:
-                    skeleton = await generate_skeleton(
+                    skeleton, smeta = await generate_skeleton_windows(
                         client, paras, base_url, api_key, model,
-                        doc_hint=unit.get("source_title") or "")
+                        doc_hint=unit.get("source_title") or "", profile=profile)
+                    if skeleton is not None:
+                        smeta["route"] = "ai"
                 except Exception as e:
                     task.messages.append(f"骨架生成跳过 ({e})")
+                    smeta = {"route": "prose_fallback", "windows": 0,
+                             "attempts": 0, "schema_failures": 0, "score": 0.0}
+            if skeleton is None and paras:
+                try:
+                    skeleton = sq.deterministic_skeleton(paras, profile)
+                    if skeleton is not None:
+                        sv = sq.validate_skeleton(skeleton, len(paras), profile)
+                        sg = sq.title_grounding(skeleton, paras)
+                        smeta = {"route": "deterministic", "windows": 1,
+                                 "attempts": 0, "schema_failures": 0,
+                                 "validation": sv, "grounding": sg,
+                                 "score": sq.quality_score(skeleton, sv, sg)}
+                except Exception as e:
+                    print(f"  deterministic skeleton skipped: {e}")
+                    skeleton = None
+
             root, rep = fragment_to_tree(text, skeleton,
                                         unit.get("source_title") or "未命名")
-            task.messages.append(
-                f"片段[{i + 1}/{len(units)}]："
-                f"{'AI骨架' if skeleton else '段落保底'}"
-                f"，{rep.get('paragraphs', 0)} 段原文保留"
-                + (f"，丢 {rep.get('lost', 0)} 段" if rep.get('lost') else ""))
-            unit_tree = {"title": unit.get("unit_title")
-                         or unit.get("source_title") or "未命名",
+            root_title = (root.get("title") or "").strip()
+            if not root_title or root_title in ("未命名", "未命名文档"):
+                root_title = unit.get("unit_title") or unit.get("source_title") or "未命名"
+            unit_tree = {"title": root_title,
                          "children": root.get("children") or []}
+            try:
+                unit_tree["children"] = apply_hierarchy_repair(
+                    unit_tree["children"], profile=profile)
+            except Exception as e:
+                print(f"  Hierarchy repair skipped (skeleton): {e}")
+            try:
+                audit = audit_tree_skeleton(unit_tree["children"])
+                smeta["skeleton_audit"] = {
+                    "placeholders": len(audit.get("placeholders") or []),
+                    "errors": audit.get("errors_after", 0),
+                }
+            except Exception as e:
+                print(f"  Skeleton audit skipped (skeleton): {e}")
             try:
                 from placement_audit import fix_topic_placement
                 pr = fix_topic_placement(unit_tree["children"])
@@ -1061,8 +1279,21 @@ async def _skeleton_units_to_trees(units: list, task: TaskProgress,
                     task.messages.append(f"归属修正：「{mv['title']}」 → 「{mv['to']}」")
             except Exception as e:
                 print(f"  Placement audit skipped (skeleton): {e}")
+            smeta.update({
+                "paragraphs": rep.get("paragraphs", len(paras)),
+                "lost": rep.get("lost", 0),
+                "anchored_by": rep.get("anchored_by", ""),
+            })
+            task.messages.append(
+                f"片段[{i + 1}/{len(units)}]："
+                f"{ {'ai': 'AI骨架', 'deterministic': '确定性骨架'}.get(smeta.get('route'), '段落保底') }"
+                f"，{rep.get('paragraphs', 0)} 段原文保留"
+                + (f"，丢 {rep.get('lost', 0)} 段" if rep.get('lost') else "")
+                + (f"，骨架质量 {smeta.get('score', 0):.0%}"
+                   if smeta.get('route') in ('ai', 'deterministic') else ""))
             trees.append(unit_tree)
-    return trees
+            metas.append(smeta)
+    return trees, metas
 
 
 async def _llm_structure_chunks(units: list[dict], task: TaskProgress, chat: dict) -> list[dict]:
@@ -1137,28 +1368,39 @@ def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict 
     unit_meta_by_stem = unit_meta_by_stem or {}
 
     for md_path in sorted(md_files):
-        with open(md_path, encoding="utf-8") as f:
-            md_text = f.read().strip()
-
         filename = os.path.splitext(os.path.basename(md_path))[0]
         unit_meta = unit_meta_by_stem.get(filename, {})
 
         # ── 结构前置（解析入口）：先立骨架，再挂内容 ──
-        # 恢复丢失的大纲标题（纯文本"第X节/知识点X"按序列连续性提升）、
-        # 剔除重复页眉、补全章名。对结构完好的文档零改动。
-        skeleton = None
-        try:
-            md_text, skeleton = normalize_markdown_outline(md_text, doc_hint=filename)
+        # run_pipeline 已在结构路由前恢复过一次，这里直接复用恢复后的文本与
+        # 报告，避免同一份文档被 normalize 两遍。
+        md_text = unit_meta.get("normalized_text")
+        skeleton = unit_meta.get("outline_report")
+        profile = unit_meta.get("numbering_profile") or None
+        if md_text is None:
+            with open(md_path, encoding="utf-8") as f:
+                md_text = f.read().strip()
+            skeleton = None
+            try:
+                from numbering_profile import probe_numbering_profile
+                profile = _apply_numbering_config(
+                    probe_numbering_profile(md_text, doc_hint=filename)) or None
+            except Exception:
+                profile = None
+            try:
+                md_text, skeleton = normalize_markdown_outline(
+                    md_text, doc_hint=filename, profile=profile)
+            except Exception as e:
+                print(f"  Outline normalization skipped for {filename}: {e}")
+        if skeleton:
             for r in skeleton.get("recovered", []):
                 print(f"  骨架恢复： 「{r['title']}」 (line {r['line']})")
             for d in skeleton.get("dropped_headers", []):
                 print(f"  页眉剔除： 「{d['text']}」 ×{d['count']}")
-        except Exception as e:
-            print(f"  Outline normalization skipped for {filename}: {e}")
 
-        nodes = parse_md_to_nodes(md_text)
+        nodes = parse_md_to_nodes(md_text, profile=profile)
         nodes = adjust_standalone_levels(nodes)
-        nodes = apply_hierarchy_repair(nodes)
+        nodes = apply_hierarchy_repair(nodes, profile=profile)
         tree_children = build_tree(nodes)
 
         # ── 结构前置（建树后）：序列校验 + 缺失边界占位修复 ──
@@ -1217,6 +1459,8 @@ def _build_trees_from_md(md_files: list, work_dir: str, unit_meta_by_stem: dict 
             "unit_order": unit_meta.get("unit_order", 0),
             "placement_moved": placement.get("moved", []),
             "skeleton": skeleton or {},
+            "numbering_profile": profile or {},
+            "route": "regex",
         })
 
     return tree_files
@@ -1331,11 +1575,22 @@ def _fix_hierarchy_and_merge(tree_files: list, work_dir: str) -> dict:
 
     for order in source_order:
         source_nodes = []
-        for tf in grouped[order]:
-            for child in tf["tree"].get("children", []):
-                source_nodes.append(copy.deepcopy(child))
-
-        nested_children = _nest_nodes_by_hierarchy(source_nodes)
+        group = sorted(grouped[order],
+                       key=lambda item: (item.get("unit_order", 0), item["filename"]))
+        if any(tf.get("route") == "skeleton" for tf in group):
+            # AI 骨架树已经过 hierarchy_repair/audit，不能再被章/节重组拉平；
+            # regex 片段仍按原逻辑逐单元整理。
+            for tf in group:
+                children = copy.deepcopy(tf["tree"].get("children", []))
+                if tf.get("route") == "skeleton":
+                    source_nodes.extend(children)
+                else:
+                    source_nodes.extend(_nest_nodes_by_hierarchy(children))
+            nested_children = source_nodes
+        else:
+            for tf in group:
+                source_nodes.extend(copy.deepcopy(tf["tree"].get("children", [])))
+            nested_children = _nest_nodes_by_hierarchy(source_nodes)
         _shift_tree_levels(nested_children, 1)
 
         source_title = source_titles[order]
@@ -1764,14 +2019,14 @@ async def api_export(task_id: str):
     else:
         return JSONResponse({"error": "Task not yet completed"}, status_code=400)
 
-    html_content = _generate_offline_html()
+    html_content = _generate_offline_html(final_result)
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("mindmap.html", html_content)
-        # 离线页面是 tree_mindmap.html 的副本，必须带上它依赖的 theme.css / common.js，
-        # 否则解压后打开会缺样式、缺公共库（表现为 KT.xxx is not a function）。
-        for asset in ("cds-theme.css", "theme.css", "common.js"):
+        # The offline page is a copy of tree_mindmap.html: every local asset it
+        # references must ship with it (vendor engine, map modules, theme).
+        for asset in _offline_asset_list():
             asset_path = os.path.join(UI_DIR, asset)
             if os.path.isfile(asset_path):
                 zf.write(asset_path, asset)
@@ -1807,8 +2062,32 @@ def _write_directory_to_zip(zf: zipfile.ZipFile, source_dir: str, archive_dir: s
             zf.write(file_path, archive_path)
 
 
-def _generate_offline_html() -> str:
-    """Generate offline HTML that loads tree data from json/knowledge_tree.json."""
+def _offline_asset_list() -> tuple:
+    """Local assets referenced by the offline map page (relative to ui/)."""
+    return (
+        "embed-mode.js",
+        "favicon.svg",
+        "common.js",
+        "cds-theme.css",
+        "theme.css",
+        "client-embed.css",
+        "knowledge_map.css",
+        "map/map_adapter.js",
+        "map/knowledge_map.js",
+        "map/map_exports.js",
+        "vendor/mind-elixir/mind-elixir.iife.js",
+        "vendor/mind-elixir/MindElixir.css",
+        "vendor/mind-elixir/Outliner.css",
+        "vendor/export-mindmap/export-mindmap.umd.js",
+    )
+
+
+def _generate_offline_html(tree: dict = None) -> str:
+    """Generate a read-only offline map page with the tree embedded.
+
+    The tree is embedded as JSON instead of fetched, so the ZIP also works when
+    opened via file:// (where fetch of sibling files is blocked by CORS).
+    """
     template_path = os.path.join(UI_DIR, "tree_mindmap.html")
     html = Path(template_path).read_text(encoding="utf-8")
 
@@ -1816,33 +2095,40 @@ def _generate_offline_html() -> str:
         "<title>AnythingMindmap - Mind Map</title>",
         "<title>AnythingMindmap - Offline Mind Map</title>",
     )
-    html = html.replace("正在加载知识树…", "正在加载 json/knowledge_tree.json …")
-    html = html.replace(" | Parts: ", " | Chapters: ")
+    html = html.replace("正在加载知识树…", "正在加载离线知识树…")
 
-    loader_start = html.index("async function loadAllParts() {")
-    loader_end = html.index("function flattenNodes", loader_start)
-    loader_replacement = """async function loadTreeData() {
-  const response = await fetch('./json/knowledge_tree.json', { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Failed to load json/knowledge_tree.json: ${response.status}`);
-  }
-  const rawData = await response.json();
-  return transformNode(rawData);
-}
-
-"""
-    html = html[:loader_start] + loader_replacement + html[loader_end:]
-    html = html.replace("treeData = await loadAllParts();", "treeData = await loadTreeData();")
-    # 离线包没有后端：去掉对话复习组件，隐藏依赖服务端的入口（总览 / 设置），
-    # 并去掉静态资源的 ?v= 查询串（file:// 下没必要，也避免个别浏览器解析差异）。
-    # 版本号用正则剥掉：?v= 会随公共库改动递增，写死会漏替换导致离线包缺资源。
+    # No backend: drop the review widget and hide server-only links.
     html = re.sub(r'<script src="review_widget\.js(\?v=\d+)?"\s*></script>', "", html)
-    html = html.replace('<a class="tb-link" id="btnOverview"', '<a class="tb-link" id="btnOverview" style="display:none"')
-    html = html.replace('<a href="/ui/settings.html" class="theme-toggle"', '<a href="#" class="theme-toggle" style="display:none"')
-    html = re.sub(r'(common\.js|theme\.css)\?v=\d+', r'\1', html)
     html = html.replace(
-        "Make sure you are serving this file via HTTP (e.g. <code>python -m http.server</code>), not opening directly as file://",
-        "Make sure <code>mindmap.html</code> is next to the <code>chapters/</code>, <code>md/</code>, and <code>json/</code> folders after unzip, and serve the folder via HTTP (e.g. <code>python -m http.server</code>)",
+        '<a class="ktm-link-btn" id="btnOverview"',
+        '<a class="ktm-link-btn" id="btnOverview" style="display:none"',
+    )
+    html = html.replace(
+        '<a href="/ui/settings.html" class="ktm-link-btn"',
+        '<a href="#" class="ktm-link-btn" style="display:none"',
+    )
+    # file:// has no cache-busting need; keep relative asset names stable.
+    html = re.sub(r'(\.js|\.css)\?v=\d+', r'\1', html)
+
+    offline_flag = "<script>window.KT_OFFLINE=true;</script>\n"
+    if '<script src="common.js' in html:
+        html = html.replace('<script src="common.js', offline_flag + '<script src="common.js', 1)
+    else:
+        html = html.replace("</head>", offline_flag + "</head>", 1)
+
+    if tree is not None:
+        payload = json.dumps(tree, ensure_ascii=False).replace("</", "<\\/")
+        tree_script = ('<script type="application/json" id="kt-offline-tree">'
+                       + payload + "</script>\n")
+        marker = "<script>\n(function () {"
+        if marker in html:
+            html = html.replace(marker, tree_script + marker, 1)
+        else:
+            html = html.replace("</body>", tree_script + "</body>", 1)
+
+    html = html.replace(
+        "返回资料库",
+        "离线包仅包含知识树，不包含原始文件；重新解析请在桌面端打开资料",
     )
     return html
 
@@ -1925,6 +2211,160 @@ async def api_update_node(data: dict):
             _update_cached_tree(cache_key, tree)
 
     return {"status": "ok", "title": new_title, "content_updated": new_content is not None}
+
+
+@app.get("/api/tree/{key:path}")
+async def api_get_tree(key: str):
+    """Canonical tree read for the map page: tree + optimistic-concurrency rev."""
+    resource = _resolve_tree_resource(key)
+    if not resource:
+        return JSONResponse({"error": f"未找到资料: {key}"}, status_code=404)
+
+    if resource["kind"] == "task":
+        task_id = resource["task_id"]
+        with tasks_lock:
+            task = tasks.get(task_id)
+        if task is not None and task.status == "processing" and not os.path.isfile(resource["tree_path"]):
+            return JSONResponse(
+                {"status": "processing", "progress": task.progress, "stage": task.stage},
+                status_code=202,
+            )
+        if task is not None and task.status == "done" and isinstance(task.result, dict):
+            tree = task.result
+        else:
+            try:
+                with open(resource["tree_path"], encoding="utf-8") as f:
+                    tree = json.load(f)
+            except (OSError, json.JSONDecodeError) as e:
+                return JSONResponse({"error": f"读取知识树失败: {e}"}, status_code=500)
+        state = load_task_state(task_id)
+        title = (task.title if task is not None and task.title else
+                 (state or {}).get("title") or tree.get("title") or "")
+    else:
+        try:
+            with open(resource["tree_path"], encoding="utf-8") as f:
+                tree = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            return JSONResponse({"error": f"读取知识树失败: {e}"}, status_code=500)
+        title = tree.get("title") or ""
+
+    node_count = 0
+    try:
+        for _node, _depth in _walk_tree_payload(tree):
+            node_count += 1
+    except ValueError:
+        pass
+    return JSONResponse({
+        "key": resource["key"],
+        "title": title,
+        "rev": _tree_rev(tree),
+        "tree": tree,
+        "node_count": node_count,
+        "readonly": False,
+    })
+
+
+@app.post("/api/tree/save")
+async def api_tree_save(data: dict):
+    """Save a map-edited tree with revision conflict detection + backup.
+
+    The client sends the full tree from the adapter. The server merges by node
+    id into the current file so unknown/parser fields survive, and refuses root
+    title changes (those belong to /api/rename, which also migrates title state).
+    """
+    key = str((data or {}).get("key") or "").strip()
+    base_rev = str((data or {}).get("base_rev") or "").strip()
+    incoming = (data or {}).get("tree")
+    if not key or not isinstance(incoming, dict):
+        return JSONResponse({"error": "缺少 key 或 tree"}, status_code=400)
+    if not base_rev:
+        return JSONResponse({"error": "缺少 base_rev"}, status_code=400)
+
+    resource = _resolve_tree_resource(key)
+    if not resource:
+        return JSONResponse({"error": f"未找到资料: {key}"}, status_code=404)
+    tree_path = resource["tree_path"]
+    kind = resource["kind"]
+
+    validation = _validate_tree_payload(incoming)
+    if validation:
+        return JSONResponse({"error": validation}, status_code=400)
+
+    with tree_write_lock:
+        try:
+            with open(tree_path, encoding="utf-8") as f:
+                current = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            return JSONResponse({"error": f"读取知识树失败: {e}"}, status_code=500)
+
+        current_rev = _tree_rev(current)
+        if current_rev != base_rev:
+            return JSONResponse(
+                {"error": "conflict", "rev": current_rev, "saved_at": os.path.getmtime(tree_path)},
+                status_code=409,
+            )
+
+        current_title = str(current.get("title") or "").strip()
+        incoming_title = str(incoming.get("title") or "").strip()
+        if current_title and incoming_title and current_title != incoming_title:
+            return JSONResponse(
+                {"error": "根标题不能在导图中修改，请到资料库重命名"},
+                status_code=400,
+            )
+
+        try:
+            merged = _merge_tree_by_id(current, incoming)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        merged_validation = _validate_tree_payload(merged)
+        if merged_validation:
+            return JSONResponse({"error": merged_validation}, status_code=400)
+        if not merged.get("title"):
+            merged["title"] = current_title or incoming_title or "知识树"
+
+        backup_path = ""
+        try:
+            backup_path = _backup_tree_file(tree_path, kind, current_rev)
+            tmp = tree_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(merged, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, tree_path)
+        except OSError as e:
+            return JSONResponse({"error": f"保存知识树失败: {e}"}, status_code=500)
+
+    new_rev = _tree_rev(merged)
+    changes = _tree_change_summary(current, merged)
+
+    # Keep the live task result and content cache in sync. Reports/guides are
+    # parse-time snapshots and intentionally not recomputed.
+    cache_key = ""
+    if kind == "task":
+        task_id = resource["task_id"]
+        with tasks_lock:
+            task = tasks.get(task_id)
+        if task is not None and task.status == "done":
+            task.result = merged
+            task.title = merged.get("title") or task.title
+            task.persist_state()
+            cache_key = getattr(task, "cache_key", "")
+        state = load_task_state(task_id)
+        if not cache_key:
+            cache_key = (state or {}).get("cache_key", "")
+        _write_task_state_fields(task_id, title=merged.get("title") or (state or {}).get("title", ""),
+                                 tree_edited=True, tree_rev=new_rev)
+        if cache_key:
+            _update_cached_tree(cache_key, merged)
+
+    return {
+        "ok": True,
+        "key": resource["key"],
+        "rev": new_rev,
+        "saved_at": time.time(),
+        "node_count": sum(1 for _ in _walk_tree_payload(merged)),
+        "changes": changes,
+        "backup": os.path.basename(backup_path) if backup_path else "",
+        "review_progress_exists": _review_progress_exists(resource["key"]),
+    }
 
 
 @app.post("/api/rename")
@@ -2674,6 +3114,206 @@ def _resolve_tree_resource(key: str):
     return None
 
 
+def _tree_rev(tree: dict) -> str:
+    """Short stable revision for optimistic concurrency."""
+    canonical = json.dumps(tree, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def _walk_tree_payload(node, depth=0):
+    if not isinstance(node, dict):
+        raise ValueError("节点必须是对象")
+    if depth > TREE_MAX_DEPTH:
+        raise ValueError(f"树深度超过 {TREE_MAX_DEPTH} 层")
+    yield node, depth
+    children = node.get("children")
+    if children is None:
+        return
+    if not isinstance(children, list):
+        raise ValueError("children 必须是数组")
+    for child in children:
+        yield from _walk_tree_payload(child, depth + 1)
+
+
+def _validate_tree_payload(tree: dict) -> str:
+    """Return an error string, or '' when the tree is safe to persist."""
+    if not isinstance(tree, dict):
+        return "树必须是对象"
+    title = tree.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return "根节点 title 不能为空"
+    if len(title) > TREE_MAX_TITLE:
+        return f"标题超过 {TREE_MAX_TITLE} 字"
+    try:
+        raw = json.dumps(tree, ensure_ascii=False)
+    except (TypeError, ValueError) as e:
+        return f"树不是合法 JSON：{e}"
+    if len(raw.encode("utf-8")) > TREE_MAX_BYTES:
+        return "树超过 10MB 限制"
+    seen = set()
+    count = 0
+    try:
+        for node, depth in _walk_tree_payload(tree):
+            count += 1
+            if count > TREE_MAX_NODES:
+                return f"节点数超过 {TREE_MAX_NODES} 限制"
+            node_title = node.get("title", node.get("name"))
+            if not isinstance(node_title, str) or not node_title.strip():
+                return f"第 {count} 个节点 title 为空"
+            if len(node_title) > TREE_MAX_TITLE:
+                return f"节点标题超过 {TREE_MAX_TITLE} 字"
+            node_id = node.get("id")
+            if not isinstance(node_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", node_id):
+                return f"节点 id 非法：{node_id!r}"
+            if node_id in seen:
+                return f"节点 id 重复：{node_id}"
+            seen.add(node_id)
+    except ValueError as e:
+        return str(e)
+    return ""
+
+
+def _tree_has_ids(tree: dict) -> bool:
+    try:
+        for node, _ in _walk_tree_payload(tree):
+            if not isinstance(node.get("id"), str):
+                return False
+        return True
+    except ValueError:
+        return False
+
+
+def _clean_new_tree_node(node: dict) -> dict:
+    """Accept a new client node but never persist Mind Elixir view fields."""
+    if not isinstance(node, dict):
+        raise ValueError("新节点必须是对象")
+    drop = {"parent", "style", "tags", "icons", "branchColor", "expanded",
+            "direction", "dangerouslySetInnerHTML"}
+    cleaned = {k: v for k, v in node.items() if k not in drop}
+    children = cleaned.get("children")
+    if children is not None:
+        if not isinstance(children, list):
+            raise ValueError("children 必须是数组")
+        cleaned["children"] = [_clean_new_tree_node(child) for child in children]
+    return cleaned
+
+
+def _merge_tree_by_id(current: dict, incoming: dict) -> dict:
+    """Preserve server-side fields, apply client changes, delete omitted nodes.
+
+    The map adapter carries every field it knows about, but the merge keeps any
+    server field the client omitted (future schema, imported metadata) so a UI
+    round-trip can never silently erase parser/AI output.
+    """
+    def merge_node(cur: dict, inc: dict) -> dict:
+        result = dict(cur)
+        for key, value in inc.items():
+            if key in ("id", "children"):
+                continue
+            result[key] = value
+        if "children" in inc:
+            if not isinstance(inc["children"], list):
+                raise ValueError("children 必须是数组")
+            cur_children = {
+                child.get("id"): child
+                for child in (cur.get("children") or [])
+                if isinstance(child, dict) and child.get("id")
+            }
+            merged_children = []
+            for child in inc["children"]:
+                if not isinstance(child, dict):
+                    raise ValueError("子节点必须是对象")
+                child_id = child.get("id")
+                if child_id in cur_children:
+                    merged_children.append(merge_node(cur_children[child_id], child))
+                else:
+                    merged_children.append(_clean_new_tree_node(child))
+            result["children"] = merged_children
+        return result
+
+    if not _tree_has_ids(current):
+        # First save of an old tree: ids are introduced by the client, so there
+        # is no stable key to merge against. The adapter carries the full tree.
+        merged = _clean_new_tree_node(incoming)
+        # Keep root-level fields the adapter may not know about.
+        for key, value in current.items():
+            if key not in merged and key not in ("children",):
+                merged[key] = value
+        return merged
+    return merge_node(current, incoming)
+
+
+def _tree_backup_path(tree_path: str, kind: str) -> str:
+    if kind == "task":
+        return os.path.join(os.path.dirname(tree_path), "backups")
+    return os.path.join(ENHANCED_DIR, ".backups")
+
+
+def _backup_tree_file(tree_path: str, kind: str, rev: str) -> str:
+    backup_dir = _tree_backup_path(tree_path, kind)
+    os.makedirs(backup_dir, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    name = f"{os.path.basename(tree_path).rsplit('.', 1)[0]}_{stamp}_{rev or 'new'}.json"
+    dest = os.path.join(backup_dir, name)
+    shutil.copy2(tree_path, dest)
+    try:
+        backups = sorted(
+            (os.path.join(backup_dir, item) for item in os.listdir(backup_dir)
+             if item.endswith(".json")),
+            key=os.path.getmtime,
+            reverse=True,
+        )
+        for old in backups[TREE_BACKUP_KEEP:]:
+            os.remove(old)
+    except OSError:
+        pass
+    return dest
+
+
+def _tree_change_summary(before: dict, after: dict) -> dict:
+    def index(tree):
+        out = {}
+        try:
+            for node, _ in _walk_tree_payload(tree):
+                node_id = node.get("id")
+                if node_id:
+                    out[node_id] = node
+        except ValueError:
+            pass
+        return out
+
+    old, new = index(before), index(after)
+    added = len(set(new) - set(old))
+    removed = len(set(old) - set(new))
+    renamed = sum(
+        1 for node_id in set(old) & set(new)
+        if (old[node_id].get("title") or old[node_id].get("name"))
+        != (new[node_id].get("title") or new[node_id].get("name"))
+    )
+    return {"added": added, "removed": removed, "renamed": renamed, "moved": 0}
+
+
+def _review_progress_exists(key: str) -> bool:
+    safe = re.sub(r"[^0-9A-Za-z_.一-鿿-]+", "_", key or "unknown")[:80]
+    return os.path.isfile(os.path.join(BASE_DIR, "data", "review", safe, "progress.json"))
+
+
+def _write_task_state_fields(task_id: str, **fields) -> None:
+    state = load_task_state(task_id)
+    if not isinstance(state, dict):
+        return
+    state.update(fields)
+    state["updated_at"] = time.time()
+    path = os.path.join(TEMP_DIR, task_id, "task_state.json")
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
 def _read_favorites_file() -> list:
     try:
         with open(FAVORITES_PATH, encoding="utf-8") as f:
@@ -2983,6 +3623,9 @@ async def api_settings_post(data: dict):
         if op == "set_enhance":
             cfg = _app_settings.set_enhance((data.get("scope") or "").strip())
             return {"ok": True, "enhance": cfg, "settings": _app_settings.public_view()}
+        if op == "set_numbering":
+            cfg = _app_settings.set_numbering(data)
+            return {"ok": True, "numbering": cfg, "settings": _app_settings.public_view()}
         if op == "test_provider":
             # 内联参数优先；只给 id 时用已保存的 Key/端点做测试
             base = (data.get("base_url") or "").strip()

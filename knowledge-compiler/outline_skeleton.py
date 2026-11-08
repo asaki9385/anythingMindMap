@@ -130,6 +130,7 @@ def new_report() -> dict:
         "chapter_titles": [],   # [{"line": n, "to": t}]
         "deduped_titles": [],   # [{"line": n, "text": t}]
         "duplicates": [],       # [{"parent": t, "title": t}]（同号同名，未产生占位）
+        "restarts": [],         # [{"line","family","prev","value","title"}]
         "placeholders": [],
         "warnings": [],         # [{"type","detail","line"}]
         "violations_before": 0,
@@ -292,10 +293,11 @@ def _promote_clean(s: str, tail: str):
     return clean
 
 
-def _promote_titles(lines: list, report: dict) -> int:
+def _promote_titles(lines: list, report: dict, profile: dict | None = None) -> int:
     """扫描一遍并按序列连续性提升纯文本标题；返回本遍提升数量。
 
     迭代调用直到 0（不动点），保证清理与提升的相互影响收敛、normalize 幂等。
+    profile 生效时：未知族按画像提升；编号重启不再当作重复行丢弃。
     """
     ch_num = 0
     last_sec = 0
@@ -304,6 +306,16 @@ def _promote_titles(lines: list, report: dict) -> int:
     in_table = False
     promoted = 0
     warned_lines = {w.get("line") for w in report.get("warnings", [])}
+    last_title = {}
+    generic_last = {}
+    last_line = {}
+    profile_ok = bool(profile and profile.get("effective", True))
+    known_generic_exclude = {
+        "chapter_cn", "section_cn", "knowledge_point",
+        "knowledge_point_unnumbered", "exam_point", "exam_point_unnumbered",
+    }
+    family_of_kind = {"chapter": "chapter_cn", "section": "section_cn",
+                      "kp": "knowledge_point"}
 
     for i, raw in enumerate(lines):
         s = raw.strip()
@@ -331,20 +343,27 @@ def _promote_titles(lines: list, report: dict) -> int:
                 ch_num = _num_from_raw(cm.group(1))
                 last_sec = 0
                 last_kp = 0
+                last_title["chapter"] = text
+                last_line["chapter_cn"] = i
                 continue
             sm = _SECTION_ANY_RE.match(text)
             if sm:
                 last_sec = max(last_sec, _num_from_raw(sm.group(1)))
                 last_kp = 0
+                last_title["section"] = text
+                last_line["section_cn"] = i
                 continue
             km = _KP_ANY_RE.match(text)
             if km:
                 last_kp = max(last_kp, _num_from_raw(km.group(1)))
+                last_title["kp"] = text
+                last_line["knowledge_point"] = i
             continue
 
         # 纯文本候选（先做编号空格坍缩）
         probe = _collapse_num_spaces(s)
         kind = None
+        family = None
         num = 0
         tail = ''
         m = _PLAIN_SECTION_RE.match(probe)
@@ -358,6 +377,22 @@ def _promote_titles(lines: list, report: dict) -> int:
                 m = _PLAIN_CHAPTER_RE.match(probe)
                 if m:
                     kind, num, tail = "chapter", _num_from_raw(m.group(1)), m.group(2)
+
+        # profile 生效时，尝试未知族（第X讲/单元/罗马/字母/多级点号…）
+        if kind is None and profile_ok:
+            try:
+                from numbering_profile import classify_numbering
+                info = classify_numbering(probe, profile)
+            except Exception:
+                info = None
+            if info and info.get("type") not in known_generic_exclude:
+                path = info.get("path") or []
+                if path:
+                    kind = "generic"
+                    family = info["type"]
+                    num = path[0]
+                    tail = ''
+
         if kind is None:
             continue
 
@@ -368,38 +403,72 @@ def _promote_titles(lines: list, report: dict) -> int:
         clean = _promote_clean(probe, tail)
         if clean is None:
             continue
+        if kind == "generic" and (len(clean) > 48 or re.search(r'[。；！？]', clean)):
+            continue
 
         if kind == "chapter":
             last = ch_num
         elif kind == "section":
             last = last_sec
-        else:
+        elif kind == "kp":
             last = last_kp
+        else:
+            last, _prev_title = generic_last.get(family, (0, None))
+
+        prev_title = (last_title.get(kind, "") if kind != "generic"
+                      else (generic_last.get(family, (0, ""))[1]))
+        scope_key = family if kind == "generic" else family_of_kind.get(kind)
+        restart_scope = ((profile or {}).get("restart_scope") or {}).get(scope_key)
+        is_dup = (num == last and clean == prev_title)
 
         if num <= last and last > 0:
-            continue  # 重复行：页眉/导图文字/目录，忽略
-        if num > last + 2:
-            # 大断档：序号离得太远，多半是页眉/导图文字，拒绝提升
+            if is_dup:
+                continue  # 重复行：页眉/导图文字/目录，忽略
+            if not (profile_ok and (kind == "generic" or restart_scope)):
+                continue
+            # 重启只有在“新的上级边界已经出现”时才是真重启；
+            # 否则它更可能是缺失的小节边界，交给 audit_tree_skeleton 放占位。
+            if restart_scope and restart_scope != "document":
+                if last_line.get(restart_scope, -1) <= last_line.get(scope_key, -1):
+                    continue
+            # 编号重启：这是新的边界，不是重复行。提升它，并记录。
+            report.setdefault("restarts", []).append({
+                "line": i + 1, "family": scope_key or kind,
+                "prev": last, "value": num, "title": clean[:40],
+            })
+
+        if kind != "generic":
+            if num > last + 2:
+                # 大断档：序号离得太远，多半是页眉/导图文字，拒绝提升
+                if (i + 1) not in warned_lines:
+                    report["warnings"].append({
+                        "type": f"{kind}_gap",
+                        "detail": f"编号断档（上一值 {last} → 本行 {num}）：{clean[:40]}",
+                        "line": i + 1,
+                    })
+                    warned_lines.add(i + 1)
+                continue
+            if num > last + 1:
+                # 断一档：前面恰好丢过一个标题（被整行删除），本行仍可按序列恢复。
+                # 记录告警便于回溯；后面缺失的边界由占位逻辑补齐。
+                if (i + 1) not in warned_lines:
+                    report["warnings"].append({
+                        "type": f"{kind}_gap",
+                        "detail": f"编号断档（上一值 {last} → 本行 {num}），按序列恢复：{clean[:40]}",
+                        "line": i + 1,
+                    })
+                    warned_lines.add(i + 1)
+        elif num > last + 2:
+            # 未知族跳号：允许提升，但记一条告警（可能是新的独立清单）
             if (i + 1) not in warned_lines:
                 report["warnings"].append({
-                    "type": f"{kind}_gap",
+                    "type": f"{family}_gap",
                     "detail": f"编号断档（上一值 {last} → 本行 {num}）：{clean[:40]}",
                     "line": i + 1,
                 })
                 warned_lines.add(i + 1)
-            continue
-        if num > last + 1:
-            # 断一档：前面恰好丢过一个标题（被整行删除），本行仍可按序列恢复。
-            # 记录告警便于回溯；后面缺失的边界由占位逻辑补齐。
-            if (i + 1) not in warned_lines:
-                report["warnings"].append({
-                    "type": f"{kind}_gap",
-                    "detail": f"编号断档（上一值 {last} → 本行 {num}），按序列恢复：{clean[:40]}",
-                    "line": i + 1,
-                })
-                warned_lines.add(i + 1)
 
-        # 序列吻合（或断一档可恢复）→ 提升为标题
+        # 序列吻合（或断一档可恢复/重启）→ 提升为标题
         lines[i] = '## ' + clean
         report["recovered"].append({"line": i + 1, "title": clean, "kind": kind})
         promoted += 1
@@ -407,17 +476,30 @@ def _promote_titles(lines: list, report: dict) -> int:
             ch_num = num
             last_sec = 0
             last_kp = 0
+            last_title["chapter"] = clean
+            last_line["chapter_cn"] = i
         elif kind == "section":
             last_sec = num
             last_kp = 0
-        else:
+            last_title["section"] = clean
+            last_line["section_cn"] = i
+        elif kind == "kp":
             last_kp = num
+            last_title["kp"] = clean
+            last_line["knowledge_point"] = i
+        else:
+            generic_last[family] = (num, clean)
+            last_line[family] = i
 
     return promoted
 
 
-def normalize_markdown_outline(md_text: str, doc_hint: str = "") -> tuple:
-    """解析前置规范化：返回 (新 md_text, 报告)。对结构完好的文档零改动（幂等）。"""
+def normalize_markdown_outline(md_text: str, doc_hint: str = "",
+                               profile: dict | None = None) -> tuple:
+    """解析前置规范化：返回 (新 md_text, 报告)。对结构完好的文档零改动（幂等）。
+
+    profile 生效时额外提升未知编号族，并把编号重启当作新边界（而不是重复行）。
+    """
     report = new_report()
     lines = md_text.split('\n')
 
@@ -546,7 +628,7 @@ def normalize_markdown_outline(md_text: str, doc_hint: str = "") -> tuple:
     # 首轮被密度守卫拦下的真标题在清理后应当恢复 —— 迭代到没有新提升为止，
     # 保证 normalize 幂等（第二次运行不再产生任何恢复）。
     for _ in range(6):
-        if _promote_titles(lines, report) == 0:
+        if _promote_titles(lines, report, profile=profile) == 0:
             break
 
     return '\n'.join(lines), report
@@ -794,7 +876,8 @@ def merge_reports(reports: list) -> dict:
         if not r:
             continue
         for k in ("recovered", "dropped_headers", "chapter_titles",
-                  "deduped_titles", "duplicates", "placeholders", "warnings"):
+                  "deduped_titles", "duplicates", "restarts", "placeholders",
+                  "warnings"):
             out[k].extend(r.get(k) or [])
         out["samples"].extend(r.get("samples") or [])
         for k in ("violations_before", "violations_after", "errors_before", "errors_after"):

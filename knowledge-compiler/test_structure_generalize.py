@@ -70,6 +70,22 @@ def test_scoring():
 # 2. 段落模型
 # ────────────────────────────────────────────
 
+def test_normalize_before_score():
+    print("\n1b. 先恢复再评分（纯文本标题不应被误判为结构不良）")
+    from outline_skeleton import normalize_markdown_outline
+    plain = ("第一章 教育概述\n\n第一节 教育的概念\n\n知识点一 教育的定义\n\n"
+             "教育是研究教育现象的一门科学。\n\n知识点二 教育的功能\n\n"
+             "教育具有社会性。\n\n第二章 教育发展\n\n第一节 历史\n\n"
+             "教育具有历史性。")
+    raw = ss.score_fragment(plain)
+    restored, rep = normalize_markdown_outline(plain, doc_hint="x")
+    judged = ss.score_fragment(restored)
+    check(judged["route"] == "regex",
+          f"恢复后判 regex（原始 {raw['route']} / {raw['score']} → "
+          f"恢复后 {judged['route']} / {judged['score']}）", judged["reasons"])
+    check(len(rep["recovered"]) >= 3, "纯文本标题被恢复", rep["recovered"])
+
+
 def test_paragraphs():
     print("\n2. 段落模型可逆")
     check(len(PARAS) == 5, f"切出 5 段（实得 {len(PARAS)}）")
@@ -291,6 +307,7 @@ def main():
     print("结构泛用性测试（评分 / 骨架 / 锚定）")
     print("=" * 72)
     test_scoring()
+    test_normalize_before_score()
     test_paragraphs()
     test_skeleton_parsing()
     test_anchoring()

@@ -6,9 +6,9 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>设置 · AnythingMindmap</title>
-<link rel="stylesheet" href="cds-theme.css?v=1">
-<link rel="stylesheet" href="theme.css?v=3">
-<link rel="stylesheet" href="client-embed.css?v=1">
+<link rel="stylesheet" href="cds-theme.css?v=4">
+<link rel="stylesheet" href="theme.css?v=4">
+<link rel="stylesheet" href="client-embed.css?v=2">
 <style>
 body { overflow-y: auto; }
 .page { max-width: 860px; margin: 0 auto; padding: 0 20px 80px; }
@@ -157,7 +157,7 @@ html[data-embed="1"] body { background: var(--canvas); }
 html[data-embed="1"] .page { max-width: 100%; padding: 22px 26px 56px; }
 
 </style>
-<link rel="stylesheet" href="claude-pages.css?v=1">
+<link rel="stylesheet" href="cds-pages.css?v=1">
 </head>
 <body>
 <div class="topbar">
@@ -279,6 +279,20 @@ html[data-embed="1"] .page { max-width: 100%; padding: 22px 26px 56px; }
     <div class="card-sub">决定 AI 为多少个知识点生成解读（摘要 / 关键词 / 考点）。新上传的资料按此执行；已处理的资料重新解析后生效。</div>
     <div class="enh-opts" id="enhOpts" role="radiogroup" aria-label="增强范围"></div>
   </div>
+
+  <!-- 编号体系 -->
+  <div class="card">
+    <h3><span data-icon="tree"></span> 编号体系</h3>
+    <div class="card-sub">决定如何从文档识别章节层级。自动模式会先从文档样本推断编号族顺序；手动模式可按“高层 → 低层”覆盖。新上传的资料生效。</div>
+    <div class="enh-opts" id="numOpts" role="radiogroup" aria-label="编号体系"></div>
+    <div class="field" id="numOrderField" style="display:none">
+      <label>手动顺序（高层 → 低层，逗号分隔）</label>
+      <input type="text" id="numOrder" placeholder="chapter_cn, section_cn, chinese_dotted, arabic_dotted">
+    </div>
+    <div class="form-actions">
+      <button class="btn primary" onclick="saveNumbering()">保存编号设置</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -295,7 +309,7 @@ html[data-embed="1"] .page { max-width: 100%; padding: 22px 26px 56px; }
   </div>
 </section>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="common.js?v=7"></script>
+<script src="common.js?v=8"></script>
 <script>
 'use strict';
 window.KT = window.KT || {};
@@ -355,6 +369,7 @@ async function fetchSettings() {
   renderProviders();
   renderGeneral();
   renderEnhance();
+  renderNumbering();
   renderLegacyBanner();
 }
 
@@ -364,7 +379,7 @@ async function post(payload) {
     body: JSON.stringify(payload)
   });
   var data = await res.json();
-  if (data.settings) { S = data.settings; renderProviders(); renderGeneral(); renderEnhance(); }
+  if (data.settings) { S = data.settings; renderProviders(); renderGeneral(); renderEnhance(); renderNumbering(); }
   return data;
 }
 
@@ -457,6 +472,32 @@ async function saveEnhance(scope) {
   renderEnhance();
   var label = (data && data.enhance && data.enhance.label) || scope;
   toast('增强范围已设为「' + label + '」');
+}
+
+function renderNumbering() {
+  if (!S || !S.numbering || !$('numOpts')) return;
+  var cfg = S.numbering;
+  $('numOpts').innerHTML = (cfg.options || []).map(function (o) {
+    return '<button type="button" role="radio" aria-checked="' + (o.id === cfg.mode) + '"'
+      + ' class="enh-opt' + (o.id === cfg.mode ? ' on' : '') + '" data-mode="' + o.id + '"'
+      + ' onclick="saveNumbering(\'' + o.id + '\')">'
+      + '<span class="t">' + KT.escapeHtml(o.label) + '</span>'
+      + '<span class="d">' + KT.escapeHtml(o.desc) + '</span></button>';
+  }).join('');
+  var input = $('numOrder');
+  if (input) input.value = (cfg.order || []).join(', ');
+  var field = $('numOrderField');
+  if (field) field.style.display = cfg.mode === 'manual' ? '' : 'none';
+}
+
+async function saveNumbering(mode) {
+  var m = mode || (S && S.numbering && S.numbering.mode) || 'auto';
+  var input = $('numOrder');
+  var order = input ? input.value : '';
+  var data = await post({ op: 'set_numbering', mode: m, order: order });
+  if (data && data.error) { toast('保存失败：' + data.error); return; }
+  renderNumbering();
+  toast('编号体系已保存');
 }
 
 function renderLegacyBanner() {

@@ -35,9 +35,9 @@ html[data-embed="1"] {
   --keyword-bg: color-mix(in srgb, var(--cds-clay, #d97757) 11%, transparent);
   --keyword-color: var(--cds-clay-hover, #c05b3b);
   --focus-ring: color-mix(in srgb, var(--cds-clay, #d97757) 18%, transparent);
-  --font-serif: var(--font-anthropic-serif, "Songti SC", Georgia, serif);
-  --font-sans: var(--font-anthropic-sans, "PingFang SC", system-ui, sans-serif);
-  --font-mono: var(--font-anthropic-mono, "SFMono-Regular", Menlo, monospace);
+  --font-serif: var(--font-cds-serif, "Songti SC", Georgia, serif);
+  --font-sans: var(--font-cds-sans, "PingFang SC", system-ui, sans-serif);
+  --font-mono: var(--font-cds-mono, "SFMono-Regular", Menlo, monospace);
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 10px;

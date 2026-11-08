@@ -166,6 +166,7 @@ def _defaults() -> dict:
         "mineru_token": "",
         "subject": dict(DEFAULT_SUBJECT),
         "enhance": {"scope": DEFAULT_ENHANCE_SCOPE},
+        "numbering": {"mode": "auto", "order": []},
         "updated_at": 0,
     }
 
@@ -186,6 +187,12 @@ def load() -> dict:
     enh = doc.get("enhance")
     if not isinstance(enh, dict) or enh.get("scope") not in _ENHANCE_BY_ID:
         doc["enhance"] = {"scope": DEFAULT_ENHANCE_SCOPE}
+    num = doc.get("numbering")
+    if not isinstance(num, dict) or num.get("mode") not in ("auto", "off", "manual"):
+        doc["numbering"] = {"mode": "auto", "order": []}
+    else:
+        order = num.get("order")
+        num["order"] = [str(x) for x in order] if isinstance(order, list) else []
     return doc
 
 
@@ -236,6 +243,15 @@ def public_view() -> dict:
             "scope": ((doc.get("enhance") or {}).get("scope") or DEFAULT_ENHANCE_SCOPE),
             "options": [{"id": o["id"], "label": o["label"], "desc": o["desc"]}
                         for o in ENHANCE_OPTIONS],
+        },
+        "numbering": {
+            "mode": ((doc.get("numbering") or {}).get("mode") or "auto"),
+            "order": list((doc.get("numbering") or {}).get("order") or []),
+            "options": [
+                {"id": "auto", "label": "自动识别", "desc": "从样本推断族顺序与层级（推荐）"},
+                {"id": "off", "label": "关闭", "desc": "完全使用旧的固定编号规则"},
+                {"id": "manual", "label": "手动顺序", "desc": "按下方顺序覆盖自动识别结果"},
+            ],
         },
         "builtin": {
             "chat": bool(bc),
@@ -401,6 +417,31 @@ def set_enhance(scope: str) -> dict:
     doc["enhance"] = {"scope": scope}
     save(doc)
     return enhance_config()
+
+
+def numbering_config() -> dict:
+    """编号画像策略：{mode: auto|off|manual, order: [...]}。"""
+    doc = load()
+    num = doc.get("numbering") or {}
+    mode = num.get("mode") if num.get("mode") in ("auto", "off", "manual") else "auto"
+    order = [str(x).strip() for x in (num.get("order") or []) if str(x).strip()]
+    return {"mode": mode, "order": order}
+
+
+def set_numbering(payload: dict) -> dict:
+    """保存编号策略。order 是族名列表，按高层到低层排列。"""
+    payload = payload or {}
+    mode = (payload.get("mode") or "auto").strip()
+    if mode not in ("auto", "off", "manual"):
+        raise ValueError(f"未知编号模式: {mode}")
+    order = payload.get("order") or []
+    if isinstance(order, str):
+        order = [x.strip() for x in order.replace("，", ",").split(",")]
+    order = [str(x).strip() for x in order if str(x).strip()]
+    doc = load()
+    doc["numbering"] = {"mode": mode, "order": order}
+    save(doc)
+    return numbering_config()
 
 
 def subject_config() -> dict:

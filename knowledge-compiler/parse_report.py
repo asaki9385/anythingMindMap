@@ -216,7 +216,9 @@ def structure_summary(judgements: list) -> dict:
 def build_report(tree: dict, *, task_id: str = "", files: dict | None = None,
                  tokens: dict | None = None, ai: dict | None = None,
                  audit: dict | None = None, structure: dict | None = None,
-                 skeleton: dict | None = None,
+                 skeleton: dict | None = None, fidelity: dict | None = None,
+                 numbering: dict | None = None,
+                 skeleton_quality: dict | None = None,
                  duration_sec: float | None = None,
                  generated_at: float | None = None) -> dict:
     """组装结果面板需要的全部数据。
@@ -243,6 +245,12 @@ def build_report(tree: dict, *, task_id: str = "", files: dict | None = None,
         report["structure"] = structure
     if skeleton:
         report["skeleton"] = skeleton
+    if fidelity:
+        report["fidelity"] = fidelity
+    if numbering:
+        report["numbering"] = numbering
+    if skeleton_quality:
+        report["skeleton_quality"] = skeleton_quality
     if duration_sec is not None:
         report["duration_sec"] = round(float(duration_sec), 1)
     return report

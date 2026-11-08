@@ -1,13 +1,10 @@
 /*
- * Adapted from open-claude-ui (MIT License):
- * https://github.com/Caho1/open-claude-ui
- * CDS tokens and motion constants are reused to keep the client visually aligned.
+ * Shared design-system theme and motion tokens.
+ * See THIRD_PARTY_NOTICES.md for third-party attributions.
  */
 
 /* ==========================================================================
-   Claude Design System (CDS) - Complete Production Theme & Motion Stylesheet
-   逆向溯源：基于 REA (Reverse Engineer Anything) v6.5.0 对 macOS 生产包
-   /Applications/Claude.app (@ant/desktop v2.37337.1) 全量 AST 与运行时解构提取。
+   CDS — Shared Theme & Motion Stylesheet
    ========================================================================== */
 
 :root {
@@ -18,7 +15,7 @@
   --cds-clay-hover: #cc5a36;      /* 陶土色悬停加深态 */
   --cds-clay-light: #fbf3ef;      /* 陶土极浅背景色 */
 
-  /* 1. Anthropic 官方 35 阶高精灰度标尺 (Grayscale Ramp) */
+  /* 1. 35 阶高精灰度标尺 (Grayscale Ramp) */
   --cds-gray-0: #fff;
   --cds-gray-10: #fcfcfb;
   --cds-gray-20: #f9f9f7;
@@ -55,7 +52,7 @@
   --cds-gray-890: #0d0d0d;
   --cds-gray-900: #0b0b0b;
 
-  /* 2. Anthropic 官方 35 阶橙色/陶土色标尺 (Orange/Clay Ramp) */
+  /* 2. 35 阶橙色/陶土色标尺 (Orange/Clay Ramp) */
   --cds-orange-0: #fff;
   --cds-orange-10: #fefbfa;
   --cds-orange-20: #fdf7f5;
@@ -214,9 +211,9 @@
   --font-cjk-sans-kr: "Apple SD Gothic Neo";
   --font-cjk-sans-fallback: var(--font-cjk-sans-sc), var(--font-cjk-sans-tc), var(--font-cjk-sans-jp), var(--font-cjk-sans-kr);
   --font-sans-fallbacks: system-ui, "Segoe UI", Roboto, Helvetica, Arial, var(--font-cjk-sans-fallback), sans-serif;
-  --font-anthropic-sans: "anthropic-sans", var(--font-sans-fallbacks);
-  --font-anthropic-serif: "anthropic-serif", ui-serif, Georgia, "Times New Roman", var(--font-cjk-sans-fallback), serif;
-  --font-anthropic-mono: "anthropic-mono", ui-monospace, monospace;
+  --font-cds-sans: "cds-sans", var(--font-sans-fallbacks);
+  --font-cds-serif: "cds-serif", ui-serif, Georgia, "Times New Roman", var(--font-cjk-sans-fallback), serif;
+  --font-cds-mono: "cds-mono", ui-monospace, monospace;
 
   /* 14. 语义化组件别名映射 (Component Semantic Aliases) */
   --cds-bg-surface: var(--cds-surface-2);

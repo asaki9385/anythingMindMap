@@ -55,7 +55,10 @@ knowledge-compiler/
     client.js          — 场景路由、上传、资料库、跨场景交互
     client.css         — 客户端布局与 CDS 主题
     overview.html      — 资料导览（iframe embed）
-    tree_mindmap.html  — 沉浸式思维导图（iframe embed / 离线导出模板）
+    tree_mindmap.html  — 知识地图页面壳（iframe embed / 离线导出模板）
+    knowledge_map.css  — 地图视觉、节点、搜索、小地图、编辑栏
+    map/               — map_adapter.js（树⇄Mind Elixir）、knowledge_map.js（KTMap 控制器）、map_exports.js
+    vendor/            — Mind Elixir 6 IIFE/CSS 与 export-mindmap UMD（MIT，见 VENDOR.md）
     settings.html      — 统一设置（iframe embed）
     review_widget.js   — AI 对话复习组件
     common.js          — Shared JS utilities
@@ -67,7 +70,7 @@ knowledge-compiler/
 
 - **Backend:** Python 3.10+, FastAPI, Uvicorn, PyMuPDF, httpx, python-docx
 - **AI:** DeepSeek API (OpenAI-compatible), MinerU cloud OCR
-- **Frontend:** Vanilla HTML/CSS/JS, ECharts (mind maps), GSAP + ScrollTrigger (animations)
+- **Frontend:** Vanilla HTML/CSS/JS, Mind Elixir 6 (vendored mind map engine), GSAP + ScrollTrigger (overview/settings animations)
 - **Design:** "Warm Academic" system — Noto Serif SC + Noto Sans SC + JetBrains Mono, light/dark themes
 
 ## Key Conventions
@@ -109,12 +112,21 @@ python test_structure_repair.py
 python test_review_engine.py
 python test_guide_generation.py
 python test_structure_generalize.py
+python test_fidelity.py              # 原文保真：段落/字符/标题/顺序/合成节点
+python test_numbering_profile.py     # 编号画像：族顺序/重启作用域/未知族/低置信度回退
+python test_skeleton_quality.py      # 骨架契约：全覆盖/重叠/顺序/窗口拼接/确定性降级
 python test_six_fixes.py            # 六个保守修复回归
 python test_image_refs.py           # 正文 images/ 路径清理
 python test_document_title.py       # 资料标题生成 / 重命名
 # UI 端到端（jsdom，用 JSDOM_PATH 指定 jsdom 安装位置，勿在项目内装 node_modules）
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_client.js          # 客户端壳层（五场景/路由/交互）
-JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_mindmap.js         # 导图页 + 对话组件（模式开关/导出）
+JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_mindmap.js         # 导图页 wiring（fake engine）
+JSDOM_PATH=/path/to/node_modules/jsdom node test_map_controller.js     # KTMap + 真实 Mind Elixir（jsdom 数据/DOM/事件）
+JSDOM_PATH=/path/to/node_modules/jsdom node test_map_exports.js        # 讲义/Markdown/Anki/PNG 路由
+JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_map_sync.js        # 壳层 ↔ 地图 postMessage 同步
+node test_map_adapter.js                                               # 树⇄Mind Elixir 纯数据往返/搜索/平衡
+python test_tree_save.py                                               # /api/tree/{key} + /api/tree/save
+python test_offline_map.py                                             # 离线树内嵌/资源清单
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_overview.js        # 信息页（导学/学习路径/复习进度）
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_settings.js        # 设置页（含增强范围档位）
 JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_image_refs.js      # 图片引用前端兜底
@@ -212,3 +224,104 @@ JSDOM_PATH=/path/to/node_modules/jsdom node test_ui_image_refs.js      # 图片�
   `ENHANCE_LEVELS_ALLOWED/MAX_ENHANCE_NODES`。档位只影响新上传；旧资料需重新解析才生效。
   解析报告面板按 `ai.scope_label/allowed_levels/max_nodes` 展示范围（不再写死「优先解读靠前章节」）。
 - Google Fonts are loaded via CDN — requires internet access.
+
+### 2026-11-07 思维导图内核迁移（新增，不要回退）
+
+- **导图内核是 Mind Elixir 6，不是 ECharts。** `ui/tree_mindmap.html` 不再加载 ECharts/GSAP；
+  `ui/vendor/mind-elixir/` 是提交的 IIFE + CSS（MIT，构建方式/校验和见 `ui/vendor/VENDOR.md`）。
+  不要重新引入 ECharts tree，也不要在页面里直接调用 Mind Elixir 内部 API。
+- **唯一引擎边界是 `ui/map/knowledge_map.js` 的 `KTMap`。** 页面、测试、后续学习层都通过
+  `KTMap` API；`map_adapter.js` 只做纯数据（树 ⇄ Mind Elixir、稳定 id、路径、搜索索引、平衡方向）。
+- **轻/重字段分离**：Mind Elixir 的 `metadata.kt` 只放摘要/关键词/考点/导学等轻字段；
+  `content/tables/...` 留在 `MapAdapter.heavyById`，避免每次撤销快照背着整棵树正文。
+  序列化时丢弃 `parent/style/tags/icons/branchColor/expanded/direction` 等视图字段。
+- **节点 id 只在保存时写回树**；旧树首次保存由适配层补 `n_...`。服务端 `/api/tree/save`
+  要求每个节点有合法唯一 id，按 id 合并（保留服务端未知字段），拒绝根标题修改。
+- **浏览不用 `focusNode`**（它会换文档并清空撤销栈）；搜索/定位用 `spotlight`（CSS 暗化非相关分支）。
+  默认布局 SIDE 权重平衡；节点数 >800 时默认只展开到章级（1 层），避免 1,600 节点一屏 400+ 节点。
+- **排列方向必须走引擎方向命令**：`diffRefresh(data)` 会忽略顶层 `direction`；实时切换
+  先调用 `initLeft/initRight/initSide/initDown`，再 `refresh(data)` 应用 SIDE 权重，最后
+  `scaleFit()`。只改 select 文本或只重建节点数据会造成“选项变了但图不转”。
+- **小地图走内容坐标**：`KTMapAdapter.fitBoxesToCanvas/minimapViewport` 负责纯几何；
+  不要恢复解析 `translate3d(...)` 字符串。画布需保留树连线、节点块、真实视口，并支持
+  点击/拖拽定位；621–900px 缩尺寸，≤620px 才隐藏。
+- **键盘由产品层接管**：Mind Elixir `keypress:false`，否则内置 handler 会拦截 Ctrl+F/Cmd+Z；
+  `mouseSelectionButton:2` 保留左键平移、右键框选；右键菜单是产品自己的中文菜单（`contextMenu:false`）。
+- **只读/编辑双保险**：`mei.editable` 控制拖拽/内联编辑；`before` hooks 在非编辑模式 veto
+  `addChild/insertSibling/insertParent/removeNodes/move*`；根节点不可改名/删除。
+- **编辑工具条**：7 个动作必须保持「线性图标 + 文本」且用 flex 双向居中；编辑态顶部工具栏
+  只显示 ghost「编辑中」，每屏 clay 主操作仅保留浮条「完成」。
+- **保存接口**：`GET /api/tree/{key}` 返回 `{tree,rev,node_count}`；`POST /api/tree/save`
+  用 `base_rev` 做 409 冲突检测，写前备份到 `json/backups/` 或 `.backups/`，原子写，
+  同步 live `task.result`/`task_state.tree_edited`/cache tree；不重算报告/导学/复习单元。
+- **复习进度**：`review_engine.unit_id` 仍按 path+title；改名/移动/删除会让该节点复习记录失联，
+  进入编辑模式时提示；根标题只能在资料库重命名。
+- **离线导出**：`_generate_offline_html(tree)` 把树以 `<script id="kt-offline-tree">` 内嵌，
+  页面用 `window.KT_OFFLINE` 进入只读；ZIP 资源清单是 `_offline_asset_list()`，新增本地资源必须同步。
+- **相关测试**：`test_map_adapter.js`、`test_map_controller.js`、`test_ui_mindmap.js`、
+  `test_ui_map_sync.js`、`test_map_exports.js`、`test_tree_save.py`、`test_offline_map.py`。改解析/增强语义才需要提升
+  `CACHE_VERSION`；本次 UI/保存层迁移不改变解析语义。
+
+### 2026-11-04 信效度、编号画像与骨架质量（新增，不要回退）
+
+- **先恢复再评分**：`run_pipeline` 在 `structure_score.score_fragment` 之前先跑
+  `numbering_profile.probe_numbering_profile` + `outline_skeleton.normalize_markdown_outline`。
+  纯文本「第X节/知识点X/第X讲」不应因为缺少 `#` 而被误判为结构不良送进 AI 骨架。
+  `_build_trees_from_md` 直接复用 `unit_meta["normalized_text"]`，不要重复 normalize。
+- **原文保真**：`fidelity.py` 只读审计，指标为 `paragraph_recall / char_coverage /
+  heading_recall / heading_precision / order_score / hierarchy_consistency /
+  ai_grounding`；报告字段 `report.fidelity`，逐段明细写 `fidelity.json`。
+  `ai_grounding` 只是诊断，不得当作原文覆盖率；前端「AI 解读覆盖」与「原文覆盖」
+  必须分开显示。`assert_no_content_loss` 仍是硬不变式，不能用覆盖率指标替代。
+- **编号画像**：`numbering_profile.py` 从文本探测族顺序/重启作用域/未知族，
+  `profile=None` 时完全走旧逻辑。支持 第X讲/单元/课/专题/篇/编、罗马、字母、
+  ㉑-㊿、多级点号；`outline_skeleton._promote_titles(profile=...)` 把编号重启当作
+  新边界（仅当上级边界已出现），否则交给 `audit_tree_skeleton` 放占位。
+  `repair_hierarchy` 只对 `_TYPE_CATEGORY` 之外的族使用 profile rank，避免画像
+  漏识别 section 时把知识点抬成节的兄弟。报告字段 `report.numbering`。
+- **骨架质量**：`skeleton_quality.py` 负责严格契约（全覆盖/叶间不重叠/顺序/
+  深度≤6/标题接地）、多窗口重叠拼接、确定性骨架与质量分。`skeleton_builder`
+  失败时把契约错误反馈给下一次 prompt；无模型/骨架被拒时用
+  `deterministic_skeleton`（编号切边界，否则每 6 段一块、每 3 块一层），
+  仍失败才 `paragraphs_to_tree`。报告字段 `report.skeleton_quality`。
+- **AI 树纳入同一治理**：`_skeleton_units_to_trees` 产出后同样跑
+  `apply_hierarchy_repair` + `audit_tree_skeleton` + `placement_audit`，
+  不再有“第二套树”。
+- **相关测试**：`test_fidelity.py`、`test_numbering_profile.py`、
+  `test_skeleton_quality.py`；`test_hierarchy_recovery.py` 的每个破坏模式
+  追加了原文段落召回/字符覆盖断言。修改解析/增强语义时提升 `CACHE_VERSION`。
+
+### 2026-11-08 导图页信息架构 + 节点内容编辑（新增，不要回退）
+
+- **导览/导图切换不再浮在 iframe 上**：`client.html` 新增 `#previewFrameBar`
+  （`.preview-frame-bar`，44px，surface + 发丝底边）承载 `#previewViewSwitch` 与
+  「新窗口 / AI 对话」；`.preview-frame-pane` 改为 flex 列，iframe 位于条下。
+  `.preview-side-expand` / `.mindmap-rail-expand` / `.preview-loading` 用
+  `--preview-bar-h` 下移。不要再把切换器 `position:absolute` 盖在画布上——那是
+  2026-11 前「导览/导图按钮压住导图缩放条」的根因。
+- **导图页工具栏**：`tree_mindmap.html` 拆成 `.ktm-brandbar`（标识 / 标题 / 设置 /
+  主题）与 `.ktm-toolrow > .ktm-toolbar`（`.ktm-toolgroup` + `.ktm-toolsep`）。
+  控件统一 32px 高、8px 圆角、ghost 底（hover `--ktm-fill-hover`）；每屏只允许
+  一个 clay 实心主操作（编辑中的「完成」）。embed 模式隐藏整条页头，
+  `.ktm-toolbar` 变成底部居中浮岛（16px 内缩、surface-popover + shadow-popover +
+  16px 圆角），菜单向上弹出；`#btnDrawer/#btnReview/#btnOverview` 在 embed 隐藏。
+- **菜单尺寸**：`.ktm-menu-panel` 用 `width:max-content; min-width:232px;
+  max-width:min(360px, calc(100vw - 24px))`；菜单项必须单行
+  （`white-space:nowrap`，提示 `margin-left:auto`）。不要再给 `.ktm-menu-select`
+  写 `width:100%`，否则 label 被挤成两行。
+- **CDS 令牌桥**：`knowledge_map.css` 顶部定义 `--ktm-*`（ghost fill / popover 阴影 /
+  field 阴影 / ease），底层读 `--cds-*` 并在缺失时回退；不要在导图页引入裸 HEX、
+  `transition: all` 或 34/42px 这类不在 CDS 阶梯上的高度。
+- **节点内容编辑**：编辑模式下详情面板即节点检视器——名称（单行输入）、摘要、
+  关键词（chip 增删）、原文、笔记都可就地改写。改动经 `applyNodePatch` 调用
+  `mei.reshapeNode`（一次编辑 = 一条撤销记录），600ms 防抖 + blur/change 提交；
+  输入框带 IME 守卫，写面板前会先 blur 掉画布上的 `#input-box`。
+  正文是重字段：首次编辑时把旧值补进 `metadata.kt`，**并把同一份旧值写进引擎
+  刚压栈的那条历史记录 `before` 快照**（`mei.historyStack.getEntries()`；引擎的
+  undo 只认 `getData()` 快照，不读 `operation.origin`，只改 live metadata 会被撤销
+  丢失）；`map_adapter._fromMeNode` 改为 light 覆盖 heavy，撤销/重做才还原得回来。
+  不要把未编辑节点的正文塞进 metadata（撤销快照会变大）。
+- **编辑入口**：右键「编辑名称与内容」、编辑浮条「内容」、F2 / 双击（引擎内联改名）。
+  根标题仍不可改（服务端拒绝），面板与 `applyNodePatch` 都直接提示。
+- **相关测试**：`test_map_controller.js` 增加 9 项编辑断言（面板字段、改名同步画布、
+  正文入库、撤销还原、根节点只读）；`test_ui_mindmap.js` / `test_ui_client.js` 保持通过。

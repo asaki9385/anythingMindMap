@@ -73,6 +73,7 @@
     previewTreeLoading: false,
     previewTreeError: '',
     previewChapter: '',
+    previewFrameReady: false,
     previewDrag: null,
     reportCache: {},
     loading: false
@@ -539,7 +540,8 @@
       html += '<div class="rail-head rail-outline-head"><span class="rail-head-icon">' + icon('file') + '</span>'
         + '<div class="rail-outline-title"><h2>' + esc(previewDisplayTitle(active)) + '</h2>'
         + '<span class="rail-doc-meta"><b class="rail-type ' + type.cls + '">' + type.label + '</b>'
-        + formatNumber(active.node_count || 0) + ' 个知识点 · AI 覆盖 ' + (modules.length ? Math.min(96, 64 + modules.length * 2) : 72) + '%</span></div>'
+        + '<span class="rail-doc-stats">' + formatNumber(active.node_count || 0) + ' 个知识点 · AI 覆盖 '
+        + (modules.length ? Math.min(96, 64 + modules.length * 2) : 72) + '%</span></span></div>'
         + '<button class="rail-panel-collapse" type="button" data-rail-action="mindmap-rail-collapse" title="收起左栏" aria-label="收起左栏"><span data-icon="chevronLeft"></span></button></div>'
         + '<div class="rail-outline-list">';
       if (state.previewTreeLoading) {
@@ -942,6 +944,9 @@
         + resultMetric(formatNumber(examPoints || '—'), '考点标注');
     }
     renderParseReport(report);
+    window.setTimeout(function () {
+      openResultModal(taskId, tree, report);
+    }, 480);
   }
 
   function resultMetric(value, label) {
@@ -963,7 +968,7 @@
       + '<div class="report-gauge-ring"><svg viewBox="0 0 56 56" role="img" aria-label="AI 解读覆盖率 ' + coverage + '%">'
       + '<circle class="gauge-track" cx="28" cy="28" r="' + radius + '"></circle>'
       + '<circle class="gauge-value" cx="28" cy="28" r="' + radius + '" style="stroke-dasharray:' + circumference.toFixed(2) + ';stroke-dashoffset:' + offset.toFixed(2) + '"></circle>'
-      + '<text x="28" y="29" text-anchor="middle">' + coverage + '%</text></svg><span>AI 覆盖率</span></div>'
+      + '<text x="28" y="29" text-anchor="middle">' + coverage + '%</text></svg><span>AI 解读覆盖</span></div>'
       + '<div class="report-token-breakdown">'
       + '<div class="token-bar"><span class="token-input" style="width:' + inputPct.toFixed(2) + '%"></span><span class="token-output" style="width:' + outputPct.toFixed(2) + '%"></span></div>'
       + '<div class="token-legend"><span><i class="token-dot input"></i>输入 <b>' + formatNumber(input) + '</b></span><span><i class="token-dot output"></i>输出 <b>' + formatNumber(output) + '</b></span><span><i class="token-dot total"></i>合计 <b>' + formatNumber(total) + '</b></span></div>'
@@ -971,18 +976,106 @@
       + '</div></div>';
   }
 
-  function renderParseReport(report) {
-    var box = $('resultReport');
-    if (!box) return;
+  function fidelityPct(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    var n = Number(value);
+    return isFinite(n) ? (n * 100).toFixed(1) + '%' : '—';
+  }
+
+  function renderFidelitySection(f) {
+    if (!f) return '';
+    var coverage = Math.max(0, Math.min(100, (Number(f.char_coverage) || 0) * 100));
+    var radius = 22;
+    var circumference = 2 * Math.PI * radius;
+    var offset = circumference * (1 - coverage / 100);
+    var verdict = f.verdict || {};
+    var warn = verdict.level && verdict.level !== 'high';
+    var source = f.source || {};
+    var lost = (f.lost_paragraphs || []).slice(0, 6);
+    var rows = [
+      ['段落召回', fidelityPct(f.paragraph_recall)],
+      ['标题召回', fidelityPct(f.heading_recall)],
+      ['顺序保真', fidelityPct(f.order_score)],
+      ['结构一致', fidelityPct(f.hierarchy_consistency)]
+    ];
+    var html = '<div class="report-section"><h4>原文保真' + (warn ? ' · 需关注' : '') + '</h4>'
+      + '<div class="report-gauge-row">'
+      + '<div class="report-gauge-ring"><svg viewBox="0 0 56 56" role="img" aria-label="原文覆盖率 ' + coverage.toFixed(1) + '%">'
+      + '<circle class="gauge-track" cx="28" cy="28" r="' + radius + '"></circle>'
+      + '<circle class="gauge-value" cx="28" cy="28" r="' + radius + '" style="stroke-dasharray:' + circumference.toFixed(2) + ';stroke-dashoffset:' + offset.toFixed(2) + '"></circle>'
+      + '<text x="28" y="29" text-anchor="middle">' + coverage.toFixed(1) + '%</text></svg><span>原文覆盖</span></div>'
+      + '<div class="report-kv">'
+      + rows.map(function (r) { return '<span>' + esc(r[0]) + ' <b>' + esc(r[1]) + '</b></span>'; }).join('')
+      + '<span>原文 <b>' + esc(source.paragraphs || 0) + '</b> 段 / <b>' + esc(source.headings || 0) + '</b> 个标题</span>'
+      + '</div></div>';
+    if (lost.length) {
+      html += '<details class="report-lost"><summary>未匹配段落 ' + esc(lost.length) + ' 段</summary>'
+        + lost.map(function (item) {
+          return '<p class="report-line">' + esc((item.text || '').slice(0, 80)) + '</p>';
+        }).join('') + '</details>';
+    }
+    if (warn && verdict.reasons && verdict.reasons.length) {
+      html += '<p class="report-line">' + esc(verdict.reasons.join(' · ')) + '</p>';
+    }
+    return html + '</div>';
+  }
+
+  function renderNumberingSection(n) {
+    if (!n) return '';
+    var order = n.order || [];
+    var fams = n.families || {};
+    var conf = Number(n.confidence) || 0;
+    var chips = order.slice(0, 8).map(function (name) {
+      var count = (fams[name] && fams[name].count) || 0;
+      return '<b>' + esc(name) + '</b> ×' + esc(count);
+    }).join(' · ');
+    var unknown = (n.unknown || []).slice(0, 8);
+    var html = '<div class="report-section"><h4>编号体系</h4>'
+      + '<div class="report-kv">'
+      + '<span>置信度 <b>' + Math.round(conf * 100) + '%</b></span>'
+      + '<span>重启 <b>' + esc(n.restarts || 0) + '</b></span>'
+      + '<span>文件 <b>' + esc(n.files || 1) + '</b></span>'
+      + '</div>';
+    if (chips) html += '<p class="report-line">' + chips + '</p>';
+    if (unknown.length) {
+      html += '<details class="report-lost"><summary>未识别编号 ' + esc(unknown.length) + ' 条</summary>'
+        + unknown.map(function (x) {
+          return '<p class="report-line">' + esc((x.title || '').slice(0, 60)) + '</p>';
+        }).join('') + '</details>';
+    }
+    return html + '</div>';
+  }
+
+  function renderSkeletonQualitySection(q) {
+    if (!q) return '';
+    var routes = q.route_counts || {};
+    var routeText = Object.keys(routes).map(function (k) {
+      return esc(k) + ' ×' + esc(routes[k]);
+    }).join(' · ');
+    return '<div class="report-section"><h4>骨架质量</h4>'
+      + '<div class="report-kv">'
+      + '<span>平均分 <b>' + Math.round((Number(q.avg_score) || 0) * 100) + '%</b></span>'
+      + '<span>片段 <b>' + esc(q.units || 0) + '</b></span>'
+      + '<span>窗口 <b>' + esc(q.windows || 0) + '</b></span>'
+      + '<span>降级 <b>' + esc(q.degraded || 0) + '</b></span>'
+      + '<span>未接地标题 <b>' + esc(q.ungrounded_titles || 0) + '</b></span>'
+      + '</div>'
+      + (routeText ? '<p class="report-line">' + routeText + '</p>' : '')
+      + '</div>';
+  }
+
+  function buildReportBody(report) {
     if (!report) {
-      box.innerHTML = '<div class="report-section"><h4>结果</h4><p class="report-line">知识树已经生成，但这次没有可读取的解析报告。</p></div>';
-      return;
+      return '<div class="report-section"><h4>结果</h4><p class="report-line">知识树已经生成，但这次没有可读取的解析报告。</p></div>';
     }
     var n = report.nodes || {};
     var t = report.tokens || {};
     var f = report.files || {};
     var ai = report.ai || {};
     var html = '';
+    if (report.fidelity) html += renderFidelitySection(report.fidelity);
+    if (report.numbering) html += renderNumberingSection(report.numbering);
+    if (report.skeleton_quality) html += renderSkeletonQualitySection(report.skeleton_quality);
     if (n.coverage_pct != null || ai.model) {
       html += '<div class="report-section"><h4>AI 解读</h4>'
         + renderTokenGauge(n, t)
@@ -1005,12 +1098,217 @@
         + (report.duration_sec != null ? '<span>耗时 <b>' + esc(report.duration_sec) + 's</b></span>' : '')
         + '</div></div>';
     }
-    var body = html || '<div class="report-section"><h4>结果</h4><p class="report-line">知识树已生成。可以打开导图查看完整结构。</p></div>';
+    return html || '<div class="report-section"><h4>结果</h4><p class="report-line">知识树已生成。可以打开导图查看完整结构。</p></div>';
+  }
+
+  function renderParseReport(report) {
+    var box = $('resultReport');
+    if (!box) return;
     box.innerHTML = '<details class="report-accordion" data-cds="ThinkingAccordion">'
       + '<summary><span><span class="section-kicker">PROCESS DETAILS</span><strong>处理细节</strong></span>'
       + '<span class="accordion-summary-note">AI 解读 · Token 用量 · 结构判断</span>'
       + '<span class="accordion-caret">⌄</span></summary>'
-      + '<div class="report-accordion-body">' + body + '</div></details>';
+      + '<div class="report-accordion-body">' + buildReportBody(report) + '</div></details>';
+  }
+
+  function rmPct(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    var n = Number(value);
+    return isFinite(n) ? (n * 100).toFixed(1) + '%' : '—';
+  }
+
+  function rmRatio(value) {
+    if (value === null || value === undefined || value === '') return null;
+    var n = Number(value);
+    return isFinite(n) ? Math.max(0, Math.min(100, n * 100)) : null;
+  }
+
+  function rmMetric(label, value, ratio) {
+    var pct = rmRatio(ratio);
+    return '<div class="rm-metric"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong>'
+      + (pct == null ? '' : '<i class="rm-bar"><span style="width:' + pct.toFixed(1) + '%"></span></i>')
+      + '</div>';
+  }
+
+  function rmKpi(value, label, note) {
+    return '<div class="rm-kpi"><strong>' + esc(value) + '</strong><span>' + esc(label) + '</span>'
+      + (note ? '<em>' + esc(note) + '</em>' : '') + '</div>';
+  }
+
+  function buildResultModalHtml(report, tree) {
+    var n = (report && report.nodes) || {};
+    var f = report && report.fidelity;
+    var num = report && report.numbering;
+    var sk = report && report.skeleton_quality;
+    var files = (report && report.files) || {};
+    var tokens = (report && report.tokens) || {};
+    var ai = (report && report.ai) || {};
+    var hasFidelity = !!(f && f.char_coverage != null);
+    var ratio = hasFidelity
+      ? Number(f.char_coverage)
+      : (n.coverage_pct != null ? Number(n.coverage_pct) / 100 : null);
+    var pct = rmRatio(ratio);
+    var verdict = (f && f.verdict) || {};
+    var level = hasFidelity ? (verdict.level || 'high') : 'none';
+    var levelLabels = { high: '可信度高', medium: '需要关注', low: '建议复核', none: '基础统计' };
+    var levelClasses = { high: 'is-good', medium: 'is-warn', low: 'is-bad', none: 'is-neutral' };
+    var levelLabel = levelLabels[level] || levelLabels.none;
+    var levelClass = levelClasses[level] || levelClasses.none;
+    var copy = !hasFidelity
+      ? '本次没有生成保真报告，以下按知识树基础统计展示。'
+      : level === 'high'
+        ? '原文、结构与顺序保持一致，可以放心使用。'
+        : level === 'medium'
+          ? '大部分内容已保留，建议查看未匹配段落与结构细节。'
+          : '检测到覆盖或结构缺口，建议查看完整报告后再使用。';
+
+    var radius = 38;
+    var circumference = 2 * Math.PI * radius;
+    var offset = circumference * (1 - (pct == null ? 0 : pct) / 100);
+    var ringLabel = hasFidelity ? '原文覆盖' : 'AI 解读覆盖';
+    var ring = '<div class="rm-ring"><svg viewBox="0 0 92 92" role="img" aria-label="'
+      + esc(ringLabel) + ' ' + (pct == null ? '—' : pct.toFixed(1) + '%') + '">'
+      + '<circle class="rm-ring-track" cx="46" cy="46" r="' + radius + '"></circle>'
+      + '<circle class="rm-ring-value" cx="46" cy="46" r="' + radius + '" style="stroke-dasharray:'
+      + circumference.toFixed(2) + ';stroke-dashoffset:' + offset.toFixed(2) + '"></circle>'
+      + '<text x="46" y="50" text-anchor="middle">' + (pct == null ? '—' : pct.toFixed(1) + '%') + '</text></svg>'
+      + '<span>' + esc(ringLabel) + '</span></div>';
+
+    var kpis = '<div class="rm-kpis">'
+      + rmKpi(n.modules != null ? formatNumber(n.modules) : '—', '模块', '章节分组')
+      + rmKpi(n.total != null ? formatNumber(n.total) : '—', '知识点', '树节点总数')
+      + rmKpi(n.exam_points != null ? formatNumber(n.exam_points) : '—', '考点标注', 'AI 标注')
+      + rmKpi(f && f.source ? formatNumber(f.source.paragraphs || 0) : '—', '原文段落', '对照样本')
+      + rmKpi(n.enhanced != null ? formatNumber(n.enhanced) : '—', 'AI 摘要', '已解读节点')
+      + rmKpi(report && report.duration_sec != null ? esc(report.duration_sec) + 's' : '—', '总耗时', '本次处理')
+      + '</div>';
+
+    var fidelityCard = '<section class="rm-card">'
+      + '<div class="rm-card-head"><h4>原文保真</h4><span class="rm-badge ' + levelClass + '">'
+      + esc(levelLabel) + '</span></div>'
+      + (hasFidelity
+        ? '<div class="rm-metrics">'
+          + rmMetric('段落召回', rmPct(f.paragraph_recall), f.paragraph_recall)
+          + rmMetric('字符覆盖', rmPct(f.char_coverage), f.char_coverage)
+          + rmMetric('标题召回', rmPct(f.heading_recall), f.heading_recall)
+          + rmMetric('顺序保真', rmPct(f.order_score), f.order_score)
+          + rmMetric('结构一致', rmPct(f.hierarchy_consistency), f.hierarchy_consistency)
+          + rmMetric('AI 接地（诊断）', rmPct(f.ai_grounding && f.ai_grounding.summary ? f.ai_grounding.summary.rate : null),
+            f.ai_grounding && f.ai_grounding.summary ? f.ai_grounding.summary.rate : null)
+          + '</div>'
+          + '<p class="rm-note">原文 <b>' + esc((f.source || {}).paragraphs || 0) + '</b> 段 / <b>'
+          + esc((f.source || {}).headings || 0) + '</b> 个标题'
+          + ((f.lost_paragraphs || []).length ? ' · 未匹配 <b>' + esc(f.lost_paragraphs.length) + '</b> 段' : '')
+          + '</p>'
+        : '<p class="rm-empty">这份任务还没有保真报告。重新解析后会生成段落、字符、标题与顺序指标。</p>')
+      + '</section>';
+
+    var order = (num && num.order) || [];
+    var chips = order.slice(0, 8).map(function (name) {
+      var count = (num.families && num.families[name] && num.families[name].count) || 0;
+      return '<span class="rm-chip"><b>' + esc(name) + '</b><em>×' + esc(count) + '</em></span>';
+    }).join('');
+    var numberingCard = '<section class="rm-card">'
+      + '<div class="rm-card-head"><h4>编号体系</h4>'
+      + (num && num.effective === false ? '<span class="rm-badge is-neutral">已回退固定规则</span>' : '')
+      + '</div>'
+      + (order.length
+        ? '<div class="rm-metrics rm-metrics-compact">'
+          + rmMetric('画像置信度', rmPct(num.confidence), num.confidence)
+          + '</div><div class="rm-chips">' + chips + '</div>'
+          + '<p class="rm-note">重启 <b>' + esc(num.restarts || 0) + '</b> 次 · 未识别 <b>'
+          + esc((num.unknown || []).length) + '</b> 条</p>'
+        : '<p class="rm-empty">未识别到编号体系；已按标题与段落结构处理。</p>')
+      + '</section>';
+
+    var aiRatio = n.coverage_pct != null ? Number(n.coverage_pct) / 100 : null;
+    var skeletonCard = '<section class="rm-card">'
+      + '<div class="rm-card-head"><h4>骨架与解读</h4></div>'
+      + '<div class="rm-metrics rm-metrics-compact">'
+      + rmMetric('AI 解读覆盖', rmPct(aiRatio), aiRatio)
+      + (sk ? rmMetric('骨架质量', rmPct(sk.avg_score), sk.avg_score) : '')
+      + '</div>'
+      + (sk
+        ? '<p class="rm-note">片段 <b>' + esc(sk.units || 0) + '</b> · 窗口 <b>' + esc(sk.windows || 0)
+          + '</b> · 降级 <b>' + esc(sk.degraded || 0) + '</b> · 未接地标题 <b>'
+          + esc(sk.ungrounded_titles || 0) + '</b></p>'
+        : '<p class="rm-empty">本次未使用 AI / 确定性骨架，文档结构可直接解析。</p>')
+      + '</section>';
+
+    var fileCard = '<section class="rm-card">'
+      + '<div class="rm-card-head"><h4>本次资料</h4></div>'
+      + '<div class="rm-metrics rm-metrics-compact">'
+      + rmMetric('文件', files.count != null ? files.count : '—', null)
+      + rmMetric('PDF 页数', files.pages ? files.pages : '—', null)
+      + rmMetric('Token', tokens.total_tokens ? formatNumber(tokens.total_tokens) : '—', null)
+      + '</div>'
+      + '<p class="rm-note">'
+      + (ai.model ? '模型 <b>' + esc(ai.model) + '</b>' : '未配置模型，已跳过 AI 解读')
+      + (ai.scope_label ? ' · 增强范围 <b>' + esc(ai.scope_label) + '</b>' : '')
+      + '</p></section>';
+
+    var details = report
+      ? '<details class="rm-details">'
+        + '<summary><span><span class="section-kicker">FULL REPORT</span><strong>完整处理细节</strong></span>'
+        + '<span class="rm-details-note">原文 · 编号 · 骨架 · Token</span>'
+        + '<span class="accordion-caret">⌄</span></summary>'
+        + '<div class="rm-details-body">' + buildReportBody(report) + '</div></details>'
+      : '';
+
+    return '<div class="rm-summary">'
+      + '<div class="rm-score">' + ring
+      + '<div class="rm-score-copy"><span class="rm-badge ' + levelClass + '">' + esc(levelLabel) + '</span>'
+      + '<strong>' + (hasFidelity ? '原文覆盖 ' + rmPct(f.char_coverage) : '知识树基础统计') + '</strong>'
+      + '<p>' + esc(copy) + '</p></div></div>'
+      + kpis + '</div>'
+      + '<div class="rm-grid">' + fidelityCard + numberingCard + skeletonCard + fileCard + '</div>'
+      + details;
+  }
+
+  var resultModalState = { lastTask: '', previousFocus: null, timer: 0 };
+
+  function openResultModal(taskId, tree, report) {
+    if (resultModalState.lastTask === taskId) return;
+    var modal = $('resultModal');
+    var backdrop = $('resultModalBackdrop');
+    if (!modal || !backdrop) return;
+    var title = (tree && tree.title && tree.title !== 'AnythingMindmap' && tree.title !== 'Knowledge Tree')
+      ? tree.title
+      : (state.currentTaskTitle || state.currentTaskLabel || '这份资料');
+    setText('resultModalTitle', title + ' 解析完成');
+    setText('resultModalSubtitle', '原文保真、编号体系与骨架质量已汇总。');
+    var body = $('resultModalBody');
+    if (body) body.innerHTML = buildResultModalHtml(report, tree);
+    resultModalState.previousFocus = document.activeElement;
+    modal.hidden = false;
+    backdrop.hidden = false;
+    document.body.classList.add('result-modal-open');
+    // 强制一次布局，让 hidden → visible 的过渡可靠触发（后台标签页里
+    // requestAnimationFrame 可能被节流，不能用它来加 is-open）。
+    void modal.offsetWidth;
+    backdrop.classList.add('is-open');
+    modal.classList.add('is-open');
+    resultModalState.lastTask = taskId;
+    window.setTimeout(function () {
+      var close = $('resultModalClose');
+      if (close) close.focus();
+    }, 40);
+  }
+
+  function closeResultModal() {
+    var modal = $('resultModal');
+    var backdrop = $('resultModalBackdrop');
+    if (!modal || !backdrop) return;
+    backdrop.classList.remove('is-open');
+    modal.classList.remove('is-open');
+    document.body.classList.remove('result-modal-open');
+    window.clearTimeout(resultModalState.timer);
+    resultModalState.timer = window.setTimeout(function () {
+      modal.hidden = true;
+      backdrop.hidden = true;
+    }, 260);
+    var previous = resultModalState.previousFocus;
+    if (previous && previous.focus) window.setTimeout(function () { previous.focus(); }, 0);
   }
 
   /* ── Library ─────────────────────────────────────────────────── */
@@ -1478,9 +1776,11 @@
     });
   }
 
-  function openResource(key, mode) {
+  function openResource(key, mode, chapter) {
     if (!key) return;
+    if (key !== state.activeFile) state.previewChapter = '';
     state.previewMode = mode === 'canvas' ? 'canvas' : 'overview';
+    if (typeof chapter === 'string' && chapter) state.previewChapter = chapter;
     setActiveFile(key, { silent: true });
     navigate('mindmap', { file: key, previewMode: state.previewMode });
   }
@@ -1543,6 +1843,7 @@
       state.previewTree = { key: key, modules: KT.bookModules(transformed), title: displayTitle };
       state.previewTreeKey = key;
       if (state.scene === 'mindmap') setText('previewTitle', displayTitle);
+      renderPreviewViewSwitch(false);
       updateChatContext();
       updateChatGauge();
       updateChatMentions();
@@ -1554,6 +1855,7 @@
     }).then(function () {
       state.previewTreeLoading = false;
       if (state.previewTreeKey === key) {
+        renderPreviewViewSwitch(false);
         renderPreviewSidepane();
         renderWorkspaceRail(state.scene);
       }
@@ -1612,7 +1914,26 @@
     renderPreviewSidepane();
     renderWorkspaceRail(state.scene);
     updateChatMentions();
+    var frame = $('previewFrame');
+    if (frame && state.previewFrameReady && frame.contentWindow) {
+      try {
+        frame.contentWindow.postMessage({
+          type: 'kt-map-focus',
+          chapter: state.previewChapter
+        }, window.location.origin);
+        return;
+      } catch (err) {}
+    }
     renderMindmap();
+  }
+
+  function highlightRailChapter(title) {
+    var groups = document.querySelectorAll('#workspaceRail .rail-outline-group');
+    for (var i = 0; i < groups.length; i++) {
+      var main = groups[i].querySelector('.rail-outline-main');
+      var groupTitle = main ? decodeURIComponent(main.getAttribute('data-rail-chapter') || '') : '';
+      groups[i].classList.toggle('is-active', !!title && groupTitle === title);
+    }
   }
 
   function applyPreviewSideWidth() {
@@ -1775,8 +2096,17 @@
     window.addEventListener('message', function (event) {
       if (event.origin !== location.origin || !event.data) return;
       if (event.data.type === 'kt-mindmap-ready') {
+        state.previewFrameReady = true;
         var loading = $('previewLoading');
         if (loading) loading.classList.add('is-hidden');
+        return;
+      }
+      if (event.data.type === 'kt-map-selection' && state.scene === 'mindmap') {
+        if (event.data.file && state.activeFile && event.data.file !== state.activeFile) return;
+        if (event.data.chapter) {
+          state.previewChapter = event.data.chapter;
+          highlightRailChapter(event.data.chapter);
+        }
         return;
       }
       if (event.data.type !== 'kt-preview-mode' || state.scene !== 'mindmap') return;
@@ -1816,6 +2146,13 @@
     wrap.hidden = !visible;
     if (!visible) return;
     syncPreviewViewSwitch(state.previewMode, !!animate);
+    var barTitle = $('previewFrameBarTitle');
+    if (barTitle) {
+      var record = typeof getActiveFileRecord === 'function' ? getActiveFileRecord() : null;
+      var title = record ? previewDisplayTitle(record) : '';
+      barTitle.textContent = title ? (title + ' · ' + (state.previewMode === 'canvas' ? '导图' : '导览')) : '';
+      barTitle.title = barTitle.textContent;
+    }
   }
 
   function switchPreviewMode(mode) {
@@ -1879,6 +2216,7 @@
     var url = previewUrl(state.previewMode, true);
     if (frame.getAttribute('data-src') !== url) {
       frame.setAttribute('data-src', url);
+      state.previewFrameReady = false;
       if (loading) loading.classList.remove('is-hidden');
       frame.src = url;
     }
@@ -1903,7 +2241,7 @@
     var providers = settings.providers || [];
     var active = providers.filter(function (p) { return p.active; })[0] || providers[0] || null;
     var builtin = settings.builtin || {};
-    var model = (active && active.model) || builtin.chat_model || (active && active.name) || 'Claude';
+    var model = (active && active.model) || builtin.chat_model || (active && active.name) || 'AI';
     var effortMeta = CHAT_PREF_META.thinkingEffort.options[state.chatPrefs.thinkingEffort];
     var effort = (effortMeta && effortMeta.label) || '标准';
     setText('chatEffort', effort);
@@ -2929,6 +3267,33 @@
     var resultChat = $('resultChatBtn');
     if (resultChat) resultChat.addEventListener('click', function () { navigate('chat', { file: state.activeFile }); });
 
+    // result modal
+    var resultModalClose = $('resultModalClose');
+    if (resultModalClose) resultModalClose.addEventListener('click', closeResultModal);
+    var resultModalLater = $('resultModalLaterBtn');
+    if (resultModalLater) resultModalLater.addEventListener('click', closeResultModal);
+    var resultModalBackdrop = $('resultModalBackdrop');
+    if (resultModalBackdrop) resultModalBackdrop.addEventListener('click', closeResultModal);
+    var resultModalMindmap = $('resultModalMindmapBtn');
+    if (resultModalMindmap) resultModalMindmap.addEventListener('click', function () {
+      closeResultModal();
+      openResource(state.activeFile, 'canvas');
+    });
+    var resultModalOverview = $('resultModalOverviewBtn');
+    if (resultModalOverview) resultModalOverview.addEventListener('click', function () {
+      closeResultModal();
+      openResource(state.activeFile, 'overview');
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        var modal = $('resultModal');
+        if (modal && !modal.hidden) {
+          event.preventDefault();
+          closeResultModal();
+        }
+      }
+    });
+
     // library controls
     var search = $('librarySearch');
     if (search) {
@@ -2990,6 +3355,15 @@
     if (previewChat) previewChat.addEventListener('click', function () {
       navigate('chat', { file: state.activeFile, explicit: !!state.previewChapter, chapter: state.previewChapter || '' });
     });
+    // Frame bar mirrors the two page actions next to the 导览/导图 switch.
+    var frameFull = $('frameOpenFullBtn');
+    if (frameFull) frameFull.addEventListener('click', function () {
+      if (state.activeFile) window.open(previewUrl(state.previewMode, false), '_blank', 'noopener');
+    });
+    var frameChat = $('frameChatBtn');
+    if (frameChat) frameChat.addEventListener('click', function () {
+      navigate('chat', { file: state.activeFile, explicit: !!state.previewChapter, chapter: state.previewChapter || '' });
+    });
 
     window.addEventListener('hashchange', route);
     window.addEventListener('message', function (event) {
@@ -2997,11 +3371,11 @@
       if (event.data.type === 'kt-open-chat') {
         var file = event.data.file || state.activeFile;
         if (file) setActiveFile(file, { silent: true });
-        navigate('chat', { file: file, explicit: true, chapter: event.data.chapter || '', scope: event.data.scope || 'all' });
+        navigate('chat', { file: file, explicit: true, chapter: event.data.chapter || '', scope: event.data.scope || 'all', question: event.data.question || '' });
       } else if (event.data.type === 'kt-open-library') {
         navigate('library');
       } else if (event.data.type === 'kt-open-resource') {
-        openResource(event.data.file || state.activeFile, event.data.mode || 'overview');
+        openResource(event.data.file || state.activeFile, event.data.mode || 'overview', event.data.chapter || '');
       } else if (event.data.type === 'kt-theme-request') {
         event.source && event.source.postMessage({ type: 'kt-theme', theme: KT.getTheme() }, window.location.origin);
       }

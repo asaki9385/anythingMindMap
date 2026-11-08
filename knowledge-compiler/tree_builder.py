@@ -165,8 +165,20 @@ def merge_split_chapter_titles(nodes):
 
     return merged
 
-def get_level(title, hashes):
+def get_level(title, hashes, profile=None):
     t = title.strip()
+    # profile 只负责已知规则之外的新族（第X讲/单元/罗马/字母/㉑+），
+    # 已知 15 族的硬编码层级保持不变，避免改变既有语料结果。
+    if profile:
+        try:
+            from numbering_profile import GENERIC_DEFAULT_LEVEL, classify_numbering
+            info = classify_numbering(t, profile)
+            if info and info.get('type') in GENERIC_DEFAULT_LEVEL:
+                lvl = info.get('semantic_level')
+                if lvl:
+                    return min(6, max(1, lvl))
+        except Exception:
+            pass
     if re.match(r'^第[一二三四五六七八九十百\d]+章', t): return 1
     if re.match(r'^第[一二三四五六七八九十百\d]+节', t): return 2
     if re.match(r'^知识点[一二三四五六七八九十\d]+', t):  return 3
@@ -278,7 +290,7 @@ CAPTION_RE = re.compile(
 )
 
 
-def parse_md_to_nodes(md_text):
+def parse_md_to_nodes(md_text, profile=None):
     """Markdown → flat nodes，尽量保留所有原文块。
 
     这里仍然做 Markdown 结构解析，但不把图片、HTML、代码块或首个标题前的
@@ -354,7 +366,7 @@ def parse_md_to_nodes(md_text):
             title = m.group(2).strip()
             current = {
                 'title': title,
-                'level': get_level(title, hashes),
+                'level': get_level(title, hashes, profile),
                 'content': '',
                 'children': [],
                 'captions': [],

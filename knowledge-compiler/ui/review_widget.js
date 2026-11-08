@@ -576,7 +576,7 @@
       + '    <button id="rwSend" type="button" aria-label="发送消息">' + SVG_SEND + '<span>发送</span></button>'
       + '  </div>'
       + '  <div class="rw-chin">'
-      + '    <span class="rw-chin-model" id="rwChinModel">Claude</span>'
+      + '    <span class="rw-chin-model" id="rwChinModel">AI</span>'
       + '    <span class="rw-chin-effort" id="rwChinEffort">标准</span>'
       + '    <span class="rw-chin-hint" id="rwComposerHint">Enter 发送 · Shift+Enter 换行</span>'
       + '  </div>'

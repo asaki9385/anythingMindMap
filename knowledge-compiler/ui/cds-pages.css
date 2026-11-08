@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Claude design layer for secondary AnythingMindmap pages
-   Uses the open-claude-ui CDS tokens. Loaded after page-local styles.
+   Shared design layer for secondary AnythingMindmap pages.
+   Loaded after page-local styles.
    ========================================================================== */
 
 :root {
@@ -11,13 +11,13 @@
 html, body {
   background: var(--cds-surface-0, #f9f9f7);
   color: var(--cds-text-primary, #1f1e1d);
-  font-family: var(--font-anthropic-sans, "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif);
+  font-family: var(--font-cds-sans, "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 body { font-size: 14px; line-height: 1.65; }
-code, pre { font-family: var(--font-anthropic-mono, "SFMono-Regular", Menlo, monospace); }
+code, pre { font-family: var(--font-cds-mono, "SFMono-Regular", Menlo, monospace); }
 a { color: var(--cds-clay, #d97757); }
 ::selection { background: color-mix(in srgb, var(--cds-clay, #d97757) 24%, transparent); }
 
@@ -36,7 +36,7 @@ a { color: var(--cds-clay, #d97757); }
 }
 .topbar h1 {
   margin: 0;
-  font-family: var(--font-anthropic-sans, "PingFang SC", system-ui, sans-serif);
+  font-family: var(--font-cds-sans, "PingFang SC", system-ui, sans-serif);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -.015em;
@@ -56,7 +56,7 @@ a { color: var(--cds-clay, #d97757); }
 .hero { padding: 6px 0 24px; }
 .hero h2, .hero-title {
   margin: 0;
-  font-family: var(--font-anthropic-serif, "Songti SC", Georgia, serif);
+  font-family: var(--font-cds-serif, "Songti SC", Georgia, serif);
   font-size: clamp(30px, 2.2vw, 38px);
   line-height: 1.18;
   letter-spacing: -.035em;
@@ -126,7 +126,7 @@ a { color: var(--cds-clay, #d97757); }
   display: flex;
   align-items: center;
   gap: 9px;
-  font-family: var(--font-anthropic-sans, "PingFang SC", system-ui, sans-serif);
+  font-family: var(--font-cds-sans, "PingFang SC", system-ui, sans-serif);
   font-size: 15.5px;
   font-weight: 600;
   letter-spacing: -.015em;
@@ -144,7 +144,7 @@ a { color: var(--cds-clay, #d97757); }
   padding: 0;
   border: 0;
   color: var(--cds-text-muted, #999793);
-  font-family: var(--font-anthropic-sans, "PingFang SC", system-ui, sans-serif);
+  font-family: var(--font-cds-sans, "PingFang SC", system-ui, sans-serif);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .14em;
@@ -205,7 +205,7 @@ a { color: var(--cds-clay, #d97757); }
 .hero-kicker {
   margin: 0 0 9px;
   color: var(--cds-clay-hover, #c56445);
-  font-family: var(--font-anthropic-sans, "PingFang SC", system-ui, sans-serif);
+  font-family: var(--font-cds-sans, "PingFang SC", system-ui, sans-serif);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .14em;
@@ -224,7 +224,7 @@ a { color: var(--cds-clay, #d97757); }
   box-shadow: inset 0 0 0 1px var(--cds-border, rgba(31,30,29,.1));
 }
 .stat { padding: 17px 18px; }
-.stat .num { font-family: var(--font-anthropic-serif, "Songti SC", serif); font-size: 28px; line-height: 1; }
+.stat .num { font-family: var(--font-cds-serif, "Songti SC", serif); font-size: 28px; line-height: 1; }
 .stat .label { margin-top: 7px; color: var(--cds-text-muted, #999793); font-size: 10.5px; }
 .section { margin-top: 28px; }
 .section-h {
@@ -232,7 +232,7 @@ a { color: var(--cds-clay, #d97757); }
   display: flex;
   align-items: baseline;
   gap: 9px;
-  font-family: var(--font-anthropic-sans, "PingFang SC", system-ui, sans-serif);
+  font-family: var(--font-cds-sans, "PingFang SC", system-ui, sans-serif);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -.015em;
@@ -240,7 +240,7 @@ a { color: var(--cds-clay, #d97757); }
 .section-h .hint { color: var(--cds-text-muted, #999793); font-size: 10.5px; font-weight: 400; }
 .prog-grid { gap: 12px; }
 .prog-box { padding: 16px 18px; }
-.prog-box .pn { font-family: var(--font-anthropic-serif, "Songti SC", serif); font-size: 24px; }
+.prog-box .pn { font-family: var(--font-cds-serif, "Songti SC", serif); font-size: 24px; }
 .prog-empty { padding: 18px 20px; }
 .prog-empty .btn { margin-left: auto; }
 .path-wrap {
@@ -253,7 +253,7 @@ a { color: var(--cds-clay, #d97757); }
 .path-list.is-reading .path-item:focus-visible { background: color-mix(in srgb, var(--cds-clay, #d97757) 7%, transparent); }
 .path-num { background: color-mix(in srgb, var(--cds-clay, #d97757) 12%, transparent); color: var(--cds-clay-hover, #c56445); }
 .cards { grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px; }
-.card .card-title { font-family: var(--font-anthropic-serif, "Songti SC", serif); font-size: 16px; }
+.card .card-title { font-family: var(--font-cds-serif, "Songti SC", serif); font-size: 16px; }
 .card .card-actions { border-top: 1px solid var(--cds-border, rgba(31,30,29,.1)); }
 .card .kw { background: color-mix(in srgb, var(--cds-clay, #d97757) 10%, transparent); color: var(--cds-clay-hover, #c56445); }
 .card .order-badge { background: var(--cds-surface-3, #efeee9); color: var(--cds-text-secondary, #6b6966); }
@@ -339,7 +339,7 @@ html[data-embed="1"] .sec-label { margin-top: 26px; }
 .cds-dialog-icon svg { width: 18px; height: 18px; }
 .cds-dialog-copy h3 {
   margin: 0;
-  font-family: var(--font-anthropic-sans, "PingFang SC", system-ui, sans-serif);
+  font-family: var(--font-cds-sans, "PingFang SC", system-ui, sans-serif);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -.015em;

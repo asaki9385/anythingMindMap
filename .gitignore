@@ -29,7 +29,6 @@ Thumbs.db
 !.env.example
 
 # Dev tools
-.claude/
 node_modules/
 
 # Local scratch files
@@ -46,7 +45,6 @@ dist/
 .deck-build/
 .deck-anim-build/
 .deck-support-build/
-open-claude-ui-main/
 demo-video/
 remotion-ppt-support/
 *.ppt

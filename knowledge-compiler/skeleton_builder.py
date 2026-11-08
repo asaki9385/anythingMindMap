@@ -52,6 +52,7 @@ from content_anchor import (  # noqa: E402
     anchor_skeleton, assert_no_content_loss, paragraphs_to_tree,
     paragraphs_text, split_paragraphs,
 )
+import skeleton_quality as sq  # noqa: E402
 
 API_TIMEOUT = 60
 REQUEST_DELAY = 0.3
@@ -65,7 +66,9 @@ MAX_PARAS_PER_CALL = 120
 # 提示词
 # ────────────────────────────────────────────
 
-def build_skeleton_prompt(paragraphs: list[str], doc_hint: str = "") -> str:
+def build_skeleton_prompt(paragraphs: list[str], doc_hint: str = "",
+                          profile: dict | None = None,
+                          feedback: list[str] | None = None) -> str:
     """把原文段落编号后交给模型，只要结构与归属。"""
     lines = []
     for i, p in enumerate(paragraphs):
@@ -75,11 +78,22 @@ def build_skeleton_prompt(paragraphs: list[str], doc_hint: str = "") -> str:
         lines.append(f"[{i}] {head}")
     body = "\n".join(lines)
     hint = f"\n资料类型提示：{doc_hint}\n" if doc_hint else ""
+    profile_hint = ""
+    if profile and profile.get("order"):
+        order = " > ".join(profile["order"][:8])
+        profile_hint = (
+            f"\n本资料已识别的编号体系：{order}"
+            f"（置信度 {profile.get('confidence', 0):.0%}）。\n"
+            "请优先用这些编号作为层级边界；不要新增原文没有的编号，也不要重排段落。\n")
+    feedback_hint = ""
+    if feedback:
+        feedback_hint = "\n## 上次输出的问题（必须修正）\n" + \
+            "\n".join(f"- {x}" for x in feedback[:6]) + "\n"
 
     return f"""你是教育类教材的结构分析员。下面是同一段文本被切成的 {len(paragraphs)} 个段落（已编号）。
 你的任务**只是搭骨架**：划出知识层级，并说清每一段属于哪个节点。
 
-{hint}
+{hint}{profile_hint}{feedback_hint}
 ## 原文段落
 {body}
 
@@ -207,25 +221,45 @@ def parse_skeleton_response(raw: str, n_paras: int | None = None) -> dict | None
     return root
 
 
+def parse_skeleton_response_ex(raw: str, n_paras: int | None = None,
+                               profile: dict | None = None) -> tuple:
+    """解析 + 严格契约校验。→ (骨架|None, validation)。"""
+    root = parse_skeleton_response(raw, n_paras)
+    if root is None:
+        return None, {"ok": False, "coverage": 0.0, "order_ok": False,
+                      "errors": [{"code": "schema", "detail": "骨架解析失败"}],
+                      "leaf_count": 0, "depth": 0, "overlaps": 0}
+    validation = sq.validate_skeleton(root, n_paras or 0, profile)
+    return root, validation
+
+
 # ────────────────────────────────────────────
 # 调用
 # ────────────────────────────────────────────
 
-async def generate_skeleton(client, paragraphs: list[str], url: str, api_key: str,
-                            model: str, doc_hint: str = "") -> dict | None:
-    """让模型为段落序列生成骨架。失败返回 None。"""
+async def generate_skeleton_ex(client, paragraphs: list[str], url: str, api_key: str,
+                               model: str, doc_hint: str = "",
+                               profile: dict | None = None) -> tuple:
+    """让模型为段落序列生成骨架；失败/不合格返回 (None, meta)。
+
+    与旧版的区别：每次失败都把契约错误反馈给下一次 prompt，而不是原样重试。
+    """
     paras = paragraphs[:MAX_PARAS_PER_CALL]
-    prompt = build_skeleton_prompt(paras, doc_hint)
-    payload = {
-        "model": model,
-        "max_tokens": 4000,
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"},
-        "messages": [{"role": "user", "content": prompt}],
-        **chat_body_extras(url),
-    }
+    feedback = None
+    failures = 0
     last = ""
+    attempts = 0
     for attempt in (1, MAX_RETRY + 1):
+        attempts = attempt
+        prompt = build_skeleton_prompt(paras, doc_hint, profile, feedback)
+        payload = {
+            "model": model,
+            "max_tokens": 4000,
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "user", "content": prompt}],
+            **chat_body_extras(url),
+        }
         try:
             resp = await client.post(
                 url, json=payload,
@@ -237,16 +271,72 @@ async def generate_skeleton(client, paragraphs: list[str], url: str, api_key: st
                     await asyncio.sleep(3 * attempt)
                 continue
             content = resp.json()["choices"][0]["message"]["content"]
-            sk = parse_skeleton_response(content, n_paras=len(paras))
-            if sk is not None:
-                return sk
-            last = "骨架解析失败/不合法"
+            sk, validation = parse_skeleton_response_ex(content, len(paras), profile)
+            if sk is not None and validation.get("ok"):
+                grounding = sq.title_grounding(sk, paras)
+                return sk, {
+                    "attempts": attempts,
+                    "schema_failures": failures,
+                    "validation": validation,
+                    "grounding": grounding,
+                    "score": sq.quality_score(sk, validation, grounding),
+                }
+            failures += 1
+            last = "骨架未通过契约校验"
+            feedback = [e.get("detail", "") for e in (validation.get("errors") or [])][:6]
         except Exception as e:
             last = f"{type(e).__name__}: {e}"
             break
     if last:
         print(f"  [骨架生成跳过] {last}")
-    return None
+    return None, {"attempts": attempts, "schema_failures": failures,
+                  "validation": None, "score": 0.0}
+
+
+async def generate_skeleton(client, paragraphs: list[str], url: str, api_key: str,
+                            model: str, doc_hint: str = "",
+                            profile: dict | None = None) -> dict | None:
+    """兼容旧调用：只返回骨架。"""
+    sk, _meta = await generate_skeleton_ex(
+        client, paragraphs, url, api_key, model, doc_hint, profile)
+    return sk
+
+
+async def generate_skeleton_windows(client, paragraphs: list[str], url: str,
+                                    api_key: str, model: str, doc_hint: str = "",
+                                    profile: dict | None = None) -> tuple:
+    """长文多窗口生成 + 重叠拼接。→ (骨架|None, meta)。"""
+    windows = sq.plan_windows(paragraphs)
+    parts, metas = [], []
+    for w in windows:
+        part, meta = await generate_skeleton_ex(
+            client, paragraphs[w["start"]:w["end"]], url, api_key, model,
+            doc_hint, profile)
+        if part is None:
+            return None, {
+                "windows": len(windows), "failed_window": w["index"],
+                "attempts": sum(m.get("attempts", 0) for m in metas) + meta.get("attempts", 0),
+                "schema_failures": sum(m.get("schema_failures", 0) for m in metas) + meta.get("schema_failures", 0),
+                "score": 0.0,
+            }
+        parts.append(part)
+        metas.append(meta)
+    stitched = sq.stitch_skeletons(parts, windows)
+    if stitched is None:
+        return None, {"windows": len(windows), "stitch": "failed",
+                      "attempts": sum(m.get("attempts", 0) for m in metas),
+                      "schema_failures": sum(m.get("schema_failures", 0) for m in metas),
+                      "score": 0.0}
+    validation = sq.validate_skeleton(stitched, len(paragraphs), profile)
+    grounding = sq.title_grounding(stitched, paragraphs)
+    return stitched, {
+        "windows": len(windows),
+        "attempts": sum(m.get("attempts", 0) for m in metas),
+        "schema_failures": sum(m.get("schema_failures", 0) for m in metas),
+        "validation": validation,
+        "grounding": grounding,
+        "score": sq.quality_score(stitched, validation, grounding),
+    }
 
 
 # ────────────────────────────────────────────

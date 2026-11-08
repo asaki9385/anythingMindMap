@@ -10,5 +10,4 @@
 
 更深层的解析与结构实现说明位于 [`knowledge-compiler/docs/`](../knowledge-compiler/docs/)。
 
-设计走查、重构记录、演示脚本、历史方案和测试报告统一保存在本地
-`_archive/2026-10-22-github-cleanup/process-docs/`，不进入 GitHub 仓库。
+本地开发记录与历史方案不进入 GitHub 仓库。

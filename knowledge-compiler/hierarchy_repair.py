@@ -364,7 +364,7 @@ def normalize_nodes_numbering(nodes: list[dict]) -> list[dict]:
 # Hierarchy Repair Engine
 # =============================================================================
 
-def repair_hierarchy(nodes: list[dict]) -> list[dict]:
+def repair_hierarchy(nodes: list[dict], profile: dict | None = None) -> list[dict]:
     """Repair the hierarchy of a flat node list.
 
     Strategy:
@@ -378,15 +378,27 @@ def repair_hierarchy(nodes: list[dict]) -> list[dict]:
       4. Arabic-dotted levels are elevated when under a Chinese ancestor
          to avoid competing at the same level as chapter/section.
       5. Standalone nodes (no numbering) inherit the current context.
+
+    profile: numbering_profile.probe_numbering_profile 的结果。默认 None，
+    完全保持旧行为；profile 生效时用它推断的族顺序/层级与泛化族。
     """
     if not nodes:
         return nodes
+
+    try:
+        from numbering_profile import classify_numbering, profile_rank
+    except Exception:
+        classify_numbering = None
+        profile_rank = None
+    profile_ok = bool(profile and profile.get("effective", True))
 
     # ── Phase 1: Detect numbering for all nodes ──
 
     for node in nodes:
         title = node.get('title', '')
-        info = detect_numbering_type(normalize_numbering(title))
+        info = (classify_numbering(title, profile, allow_generic=profile_ok)
+                if classify_numbering
+                else detect_numbering_type(normalize_numbering(title)))
 
         if info is None and is_box_title(title):
             # 内容框：按「（一）」同级容器处理，包住框内条目
@@ -418,6 +430,12 @@ def repair_hierarchy(nodes: list[dict]) -> list[dict]:
             continue
 
         cat = _TYPE_CATEGORY.get(ntype, 99)
+        # 画像只补充已知规则之外的新族；manual 模式允许用户显式覆盖。
+        if profile and profile_rank and (
+                profile.get('source') == 'manual' or ntype not in _TYPE_CATEGORY):
+            pr = profile_rank(profile, ntype)
+            if pr is not None:
+                cat = pr + 1
         path = node.get('number_path', [])
         depth = len(path)
 
@@ -509,13 +527,13 @@ def _fix_level_gaps(nodes: list[dict]):
 # Full Pipeline Convenience
 # =============================================================================
 
-def apply_hierarchy_repair(nodes: list[dict]) -> list[dict]:
+def apply_hierarchy_repair(nodes: list[dict], profile: dict | None = None) -> list[dict]:
     """Apply the complete hierarchy repair pipeline.
 
     normalize_numbering() → infer_semantic_level() → repair_hierarchy()
     """
     nodes = normalize_nodes_numbering(nodes)
-    nodes = repair_hierarchy(nodes)
+    nodes = repair_hierarchy(nodes, profile=profile)
     return nodes
 
 

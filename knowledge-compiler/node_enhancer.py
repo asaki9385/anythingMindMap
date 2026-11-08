@@ -306,7 +306,7 @@ def collect_postorder(node: dict, result: list):
 
 # ────────────────────────────────────────────
 # 失败分类 (Failure Taxonomy)
-# 借鉴 living-book-builder：重试决策机械化，管线永不卡死
+# 将重试决策机械化，避免单次失败阻塞整条处理管线
 # ────────────────────────────────────────────
 
 class EnhanceError(Exception):

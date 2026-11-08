@@ -643,6 +643,18 @@ def check_book(md, book, spec):
         verify_order(roots, book, errs)
     _check_markers(roots, book, errs)
     _check_absent(roots, spec.get("absent", []), errs)
+    # 原文保真：恢复链不能为了让结构好看而丢正文/丢标题。
+    try:
+        import fidelity
+        fr = fidelity.audit_unit(md, {"title": "book", "children": roots},
+                                 route="regex", skeleton_report=rep)
+        if fr["paragraph_recall"] < 1.0:
+            errs.append(f"原文段落召回 {fr['paragraph_recall']:.3f}: "
+                        f"{fr['lost_paragraphs'][:2]}")
+        if fr["char_coverage"] < 0.999:
+            errs.append(f"原文字符覆盖 {fr['char_coverage']:.3f}")
+    except Exception as e:
+        errs.append(f"保真审计异常: {type(e).__name__}: {e}")
     return errs
 
 
