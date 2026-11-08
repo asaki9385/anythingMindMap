@@ -819,7 +819,7 @@ function Get-VerifiedPythonInstaller {
 
     $needsDownload = $true
     if (Test-Path -LiteralPath $InstallerPath -PathType Leaf) {
-        $existingHash = (Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $existingHash = (Get-FileSha256 -Path $InstallerPath)
         $needsDownload = $existingHash -ne $script:PythonInstallerSha256
         if ($needsDownload) {
             # 校验不过的旧文件可能是半截下载或被安全软件改写的，删不掉也要继续重下。
@@ -867,7 +867,7 @@ function Get-VerifiedPythonInstaller {
                     }
 
                     try {
-                        $actualHash = (Get-FileHash -LiteralPath $InstallerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                        $actualHash = (Get-FileSha256 -Path $InstallerPath)
                     }
                     catch {
                         Remove-Item -LiteralPath $InstallerPath -Force -ErrorAction SilentlyContinue
@@ -909,7 +909,7 @@ function Get-VerifiedDownloadArtifact {
     $expectedHash = $ExpectedSha256.ToLowerInvariant()
 
     if (Test-Path -LiteralPath $DownloadPath -PathType Leaf) {
-        $existingHash = (Get-FileHash -LiteralPath $DownloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $existingHash = (Get-FileSha256 -Path $DownloadPath)
         if ($existingHash -eq $expectedHash) {
             Write-Host "使用已下载并通过校验的${Description}。"
             Unblock-File -LiteralPath $DownloadPath -ErrorAction SilentlyContinue
@@ -951,7 +951,7 @@ function Get-VerifiedDownloadArtifact {
                 }
 
                 try {
-                    $actualHash = (Get-FileHash -LiteralPath $DownloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    $actualHash = (Get-FileSha256 -Path $DownloadPath)
                 }
                 catch {
                     Remove-Item -LiteralPath $DownloadPath -Force -ErrorAction SilentlyContinue
@@ -1201,6 +1201,28 @@ function Ensure-ProjectVirtualEnvironment {
     return $created
 }
 
+function Get-FileSha256 {
+    param(
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    # Some Windows images / constrained PowerShell sessions do not expose
+    # Get-FileHash even though .NET crypto is available. Use the framework API
+    # directly so checksum validation always has the same behavior.
+    $stream = $null
+    $sha = $null
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        $bytes = $sha.ComputeHash($stream)
+        return [System.BitConverter]::ToString($bytes).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        if ($null -ne $sha) { $sha.Dispose() }
+        if ($null -ne $stream) { $stream.Dispose() }
+    }
+}
+
 function Test-DependenciesCurrent {
     param(
         [Parameter(Mandatory)][string]$RequirementsPath,
@@ -1215,7 +1237,7 @@ function Test-DependenciesCurrent {
         return $false
     }
 
-    $requirementsHash = (Get-FileHash -LiteralPath $RequirementsPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $requirementsHash = (Get-FileSha256 -Path $RequirementsPath)
     $recordedHash = (Get-Content -LiteralPath $StampPath -Raw).Trim().ToLowerInvariant()
     if ($requirementsHash -ne $recordedHash) {
         return $false
@@ -1363,7 +1385,7 @@ function Invoke-DependencySetup {
 
     $stampDirectory = Split-Path -Parent $StampPath
     New-Item -ItemType Directory -Force -Path $stampDirectory | Out-Null
-    $requirementsHash = (Get-FileHash -LiteralPath $RequirementsPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $requirementsHash = (Get-FileSha256 -Path $RequirementsPath)
     Set-Content -LiteralPath $StampPath -Value $requirementsHash -Encoding Ascii -NoNewline
     Write-Host "全部 Python 依赖安装成功。"
 }
@@ -1557,6 +1579,7 @@ Export-ModuleMember -Function `
     Get-SilentPythonInstallerArguments, `
     Initialize-EmbeddedPythonRuntime, `
     Test-PythonInstallerNeedsFallback, `
+    Get-FileSha256, `
     Test-DependenciesCurrent, `
     Test-ProjectWritable, `
     Ensure-ProjectVirtualEnvironment, `

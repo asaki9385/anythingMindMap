@@ -89,6 +89,18 @@ $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("mindmap-bootstrap-test
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 
 try {
+    Invoke-Test "computes dependency checksums without Get-FileHash" {
+        $hashPath = Join-Path $tempRoot "checksum.txt"
+        [System.IO.File]::WriteAllText($hashPath, "fastapi`nuvicorn`n")
+
+        $actual = Get-FileSha256 -Path $hashPath
+
+        Assert-Equal `
+            -Actual $actual `
+            -Expected "e9af2913de609d1de45b2fbab270c5a77281543c4dab6d1dd182f221fd04f683" `
+            -Message "SHA-256 checksum changed"
+    }
+
     Invoke-Test "selects the first supported Python interpreter" {
         $oldPython = New-FakePython -Directory $tempRoot -Name "python-old" -Version "3.9.18"
         $supportedPython = New-FakePython -Directory $tempRoot -Name "python-supported" -Version "3.12.10"
