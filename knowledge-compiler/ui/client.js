@@ -17,7 +17,9 @@
   var CHAT_INSIGHTS_KEY = 'kt-chat-insights-collapsed';
   var CHAT_PREFS_KEY = 'kt-chat-prefs';
   var MINDMAP_RAIL_KEY = 'kt-mindmap-rail-collapsed';
+  var API_GUIDE_SEEN_KEY = 'kt-api-guide-seen-v1';
   var MAX_FILES = 12;
+  var apiGuideState = { open: false, saving: false, previousFocus: null, timer: 0, editingId: '' };
   var initialized = false;
   var fadeRegistry = [];
   var previewResizeTimer = null;
@@ -30,6 +32,8 @@
     tasks: [],
     stats: { tree_count: 0, node_count: 0 },
     settings: null,
+    settingsLoaded: false,
+    apiGuideSeen: false,
     activeFile: '',
     selectedFiles: [],
     currentTaskId: '',
@@ -291,6 +295,7 @@
   function activateScene(scene, options) {
     options = options || {};
     if (SCENES.indexOf(scene) < 0) scene = 'home';
+    if (apiGuideState.open && scene !== 'parse') closeApiGuide({ restoreFocus: false });
     state.scene = scene;
     if (scene !== 'chat') state.chatRailDocPickerOpen = false;
     document.body.setAttribute('data-scene', scene);
@@ -323,7 +328,7 @@
     renderWorkspaceRail(scene);
 
     if (scene === 'home') renderHome();
-    if (scene === 'parse') { renderParseRecent(); renderParseFiles(); }
+    if (scene === 'parse') { renderParseRecent(); renderParseFiles(); maybeShowApiGuide(); }
     if (scene === 'library') renderLibrary();
     if (scene === 'mindmap') renderMindmap();
     if (scene === 'chat') renderChat();
@@ -743,12 +748,311 @@
     bindResourceActions(box);
   }
 
+  function settingsHasChatAccess(settings) {
+    if (!settings) return false;
+    var providers = settings.providers || [];
+    for (var i = 0; i < providers.length; i++) {
+      if (providers[i] && providers[i].has_key) return true;
+    }
+    return !!(settings.env && settings.env.has_openai_key)
+      || !!(settings.builtin && settings.builtin.chat);
+  }
+
+  function settingsHasMineruAccess(settings) {
+    if (!settings) return false;
+    return !!(settings.mineru && settings.mineru.has_token)
+      || !!(settings.builtin && settings.builtin.mineru);
+  }
+
+  function apiGuidePresets() {
+    var presets = state.settings && state.settings.presets;
+    if (Array.isArray(presets) && presets.length) return presets;
+    return [{ name: 'DeepSeek', base_url: 'https://api.deepseek.com', model: 'deepseek-v4-flash' }];
+  }
+
+  function markApiGuideSeen() {
+    state.apiGuideSeen = true;
+    try { localStorage.setItem(API_GUIDE_SEEN_KEY, '1'); } catch (err) {}
+  }
+
+  function hideApiGuideStatus() {
+    var status = $('apiGuideStatus');
+    if (!status) return;
+    status.hidden = true;
+    status.className = 'api-guide-status';
+    status.textContent = '';
+  }
+
+  function showApiGuideStatus(message, isSuccess) {
+    var status = $('apiGuideStatus');
+    if (!status) return;
+    status.hidden = false;
+    status.className = 'api-guide-status' + (isSuccess ? ' is-success' : '');
+    status.textContent = message;
+  }
+
+  function applyApiGuidePreset() {
+    var select = $('apiGuidePreset');
+    if (!select || select.value === 'custom') {
+      var customName = $('apiGuideName');
+      if (customName) customName.focus();
+      return;
+    }
+    var preset = apiGuidePresets()[Number(select.value)];
+    if (!preset) return;
+    var name = $('apiGuideName');
+    var base = $('apiGuideBaseUrl');
+    var model = $('apiGuideModel');
+    if (name) name.value = preset.name || '';
+    if (base) base.value = preset.base_url || '';
+    if (model) model.value = preset.model || '';
+    hideApiGuideStatus();
+  }
+
+  function populateApiGuideForm() {
+    var form = $('apiGuideForm');
+    var select = $('apiGuidePreset');
+    if (!form || !select) return;
+    form.reset();
+    var presets = apiGuidePresets();
+    select.innerHTML = presets.map(function (preset, index) {
+      return '<option value="' + esc(index) + '">' + esc(preset.name || ('服务商 ' + (index + 1))) + '</option>';
+    }).join('') + '<option value="custom">自定义（OpenAI 兼容）</option>';
+
+    var providers = (state.settings && state.settings.providers) || [];
+    var active = providers.filter(function (p) { return p.active; })[0] || providers[0] || null;
+    apiGuideState.editingId = '';
+    if (active && !active.has_key) {
+      apiGuideState.editingId = active.id || '';
+      select.value = 'custom';
+      $('apiGuideName').value = active.name || '';
+      $('apiGuideBaseUrl').value = active.base_url || '';
+      $('apiGuideModel').value = active.model || '';
+    } else if (presets.length) {
+      select.value = '0';
+      applyApiGuidePreset();
+    }
+
+    var mineru = $('apiGuideMineru');
+    var key = $('apiGuideKey');
+    var mineruState = $('apiGuideMineruState');
+    if (key) { key.value = ''; key.type = 'password'; }
+    if (mineru) { mineru.value = ''; mineru.type = 'password'; }
+    var keyToggle = $('apiGuideKeyToggle');
+    if (keyToggle) { keyToggle.textContent = '显示'; keyToggle.setAttribute('aria-label', '显示 API Key'); }
+    var mineruToggle = $('apiGuideMineruToggle');
+    if (mineruToggle) { mineruToggle.textContent = '显示'; mineruToggle.setAttribute('aria-label', '显示 MinerU Token'); }
+    if (mineruState) {
+      var ready = settingsHasMineruAccess(state.settings);
+      mineruState.textContent = ready ? '已配置' : '未配置';
+      mineruState.classList.toggle('is-ready', ready);
+    }
+    hideApiGuideStatus();
+    setApiGuideBusy(false);
+  }
+
+  function maybeShowApiGuide() {
+    if (apiGuideState.open || state.apiGuideSeen || state.scene !== 'parse' || !state.settingsLoaded) return;
+    if (settingsHasChatAccess(state.settings)) return;
+    openApiGuide();
+  }
+
+  function openApiGuide() {
+    var modal = $('apiGuideModal');
+    var backdrop = $('apiGuideBackdrop');
+    if (!modal || !backdrop || apiGuideState.open) return;
+    if (state.commandOpen) closeCommandPalette();
+    if (state.docPopoverOpen) closeDocPopover();
+    apiGuideState.open = true;
+    apiGuideState.previousFocus = document.activeElement;
+    markApiGuideSeen();
+    populateApiGuideForm();
+    window.clearTimeout(apiGuideState.timer);
+    modal.hidden = false;
+    backdrop.hidden = false;
+    document.body.classList.add('api-guide-open');
+    var shell = document.querySelector('.client-shell');
+    if (shell) shell.setAttribute('inert', '');
+    void modal.offsetWidth;
+    backdrop.classList.add('is-open');
+    modal.classList.add('is-open');
+    window.setTimeout(function () {
+      var key = $('apiGuideKey');
+      if (key) key.focus();
+    }, 40);
+  }
+
+  function closeApiGuide(options) {
+    options = options || {};
+    var modal = $('apiGuideModal');
+    var backdrop = $('apiGuideBackdrop');
+    if (!modal || !backdrop || !apiGuideState.open) return;
+    apiGuideState.open = false;
+    apiGuideState.saving = false;
+    backdrop.classList.remove('is-open');
+    modal.classList.remove('is-open');
+    document.body.classList.remove('api-guide-open');
+    var shell = document.querySelector('.client-shell');
+    if (shell) shell.removeAttribute('inert');
+    var key = $('apiGuideKey');
+    var mineru = $('apiGuideMineru');
+    if (key) key.value = '';
+    if (mineru) mineru.value = '';
+    apiGuideState.editingId = '';
+    window.clearTimeout(apiGuideState.timer);
+    apiGuideState.timer = window.setTimeout(function () {
+      modal.hidden = true;
+      backdrop.hidden = true;
+    }, 260);
+    if (options.restoreFocus !== false && apiGuideState.previousFocus && apiGuideState.previousFocus.focus) {
+      var previous = apiGuideState.previousFocus;
+      window.setTimeout(function () {
+        if (previous.isConnected !== false) previous.focus();
+      }, 0);
+    }
+    apiGuideState.previousFocus = null;
+  }
+
+  function trapApiGuideFocus(event) {
+    var modal = $('apiGuideModal');
+    if (!modal) return;
+    var focusables = Array.prototype.slice.call(modal.querySelectorAll(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])'
+    )).filter(function (el) {
+      if (el.closest('[hidden]')) return false;
+      var closedDetails = el.closest('details:not([open])');
+      return !closedDetails || el.tagName === 'SUMMARY';
+    });
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function toggleApiGuideSecret(inputId, buttonId, label) {
+    var input = $(inputId);
+    var button = $(buttonId);
+    if (!input || !button) return;
+    var visible = input.type === 'text';
+    input.type = visible ? 'password' : 'text';
+    button.textContent = visible ? '显示' : '隐藏';
+    button.setAttribute('aria-label', (visible ? '显示 ' : '隐藏 ') + label);
+  }
+
+  function setApiGuideBusy(busy) {
+    var button = $('apiGuideSaveBtn');
+    if (button) button.disabled = !!busy;
+    var form = $('apiGuideForm');
+    if (form) form.setAttribute('aria-busy', busy ? 'true' : 'false');
+    setText('apiGuideSaveText', busy ? '正在保存…' : '保存并继续');
+  }
+
+  function validateApiGuideForm() {
+    var name = ($('apiGuideName') || {}).value || '';
+    var base = (($('apiGuideBaseUrl') || {}).value || '').trim();
+    var model = (($('apiGuideModel') || {}).value || '').trim();
+    var key = (($('apiGuideKey') || {}).value || '').trim();
+    if (!name.trim()) {
+      showApiGuideStatus('请填写一个连接名称。');
+      $('apiGuideName').focus();
+      return false;
+    }
+    if (!/^https?:\/\/\S+$/i.test(base)) {
+      showApiGuideStatus('Base URL 需要以 http:// 或 https:// 开头。');
+      $('apiGuideBaseUrl').focus();
+      return false;
+    }
+    if (!model) {
+      showApiGuideStatus('请填写模型名，例如 deepseek-v4-flash。');
+      $('apiGuideModel').focus();
+      return false;
+    }
+    if (!key) {
+      showApiGuideStatus('请填写 API Key；如果暂时没有，可以点「稍后填写」。');
+      $('apiGuideKey').focus();
+      return false;
+    }
+    hideApiGuideStatus();
+    return true;
+  }
+
+  function postSettingsJSON(payload) {
+    return fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      return res.text().then(function (raw) {
+        var data = {};
+        if (raw) {
+          try { data = JSON.parse(raw); }
+          catch (err) { throw new Error('服务端返回了无法识别的内容'); }
+        }
+        if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+        return data;
+      });
+    });
+  }
+
+  function applySettingsSnapshot(settings) {
+    if (!settings) return;
+    state.settings = settings;
+    state.settingsLoaded = true;
+    renderConfigStrip(settings);
+  }
+
+  function saveApiGuide(event) {
+    if (event) event.preventDefault();
+    if (apiGuideState.saving || !validateApiGuideForm()) return;
+    apiGuideState.saving = true;
+    setApiGuideBusy(true);
+    var providerSaved = false;
+    var mineruToken = (($('apiGuideMineru') || {}).value || '').trim();
+    var provider = {
+      name: (($('apiGuideName') || {}).value || '').trim(),
+      base_url: (($('apiGuideBaseUrl') || {}).value || '').trim(),
+      model: (($('apiGuideModel') || {}).value || '').trim(),
+      api_key: (($('apiGuideKey') || {}).value || '').trim()
+    };
+    if (apiGuideState.editingId) provider.id = apiGuideState.editingId;
+
+    postSettingsJSON({ op: 'upsert_provider', provider: provider }).then(function (data) {
+      providerSaved = true;
+      if (data && data.id) apiGuideState.editingId = data.id;
+      applySettingsSnapshot(data && data.settings);
+      if (mineruToken) return postSettingsJSON({ op: 'set_general', mineru_token: mineruToken });
+      return data;
+    }).then(function (data) {
+      applySettingsSnapshot(data && data.settings);
+      closeApiGuide();
+      toast(mineruToken ? '模型 API 与 MinerU 已配置，可以开始解析了' : '模型 API 已配置，可以开始解析了');
+      apiGuideState.saving = false;
+      setApiGuideBusy(false);
+    }).catch(function (error) {
+      var message = error && error.message ? error.message : '未知错误';
+      showApiGuideStatus(providerSaved
+        ? '模型 API 已保存，但 MinerU Token 保存失败：' + message
+        : '保存失败：' + message);
+      apiGuideState.saving = false;
+      setApiGuideBusy(false);
+    });
+  }
+
   function loadSettings() {
     return safeFetchJSON('/api/settings').then(function (settings) {
       state.settings = settings;
+      state.settingsLoaded = true;
       renderConfigStrip(settings);
+      maybeShowApiGuide();
     }).catch(function () {
       state.settings = null;
+      state.settingsLoaded = false;
       var strip = $('parseConfigStrip');
       var text = $('parseConfigText');
       if (strip) strip.classList.add('is-warn');
@@ -762,10 +1066,14 @@
     if (!text) return;
     var providers = settings.providers || [];
     var active = providers.filter(function (p) { return p.active; })[0] || providers[0] || null;
+    var keyed = providers.filter(function (p) { return p.has_key; })[0] || null;
+    var shown = (active && active.has_key) ? active : (keyed || active);
     var builtin = settings.builtin || {};
-    var chatOk = !!(active && active.has_key) || !!(settings.env && settings.env.has_openai_key) || !!builtin.chat;
-    var mineruOk = !!(settings.mineru && settings.mineru.has_token) || !!builtin.mineru;
-    var chatName = (active && active.name) || (builtin.chat ? (builtin.chat_name || '内置服务') : '');
+    var chatOk = settingsHasChatAccess(settings);
+    var mineruOk = settingsHasMineruAccess(settings);
+    var envChat = !!(settings.env && settings.env.has_openai_key);
+    var chatName = (shown && shown.name)
+      || (builtin.chat ? (builtin.chat_name || '内置服务') : (envChat ? '环境变量模型服务' : ''));
     var subject = settings.subject && settings.subject.name ? settings.subject.name : '';
     var parts = [];
     parts.push(chatOk ? '模型服务：' + chatName : '模型服务：未配置');
@@ -774,8 +1082,8 @@
     if (settings.enhance && settings.enhance.label) parts.push('增强：' + settings.enhance.label);
     text.textContent = parts.join(' · ');
     if (strip) strip.classList.toggle('is-warn', !chatOk || !mineruOk);
-    var model = (active && active.model) || builtin.chat_model || '';
-    var provider = (active && active.name) || builtin.chat_name || '';
+    var model = (shown && shown.model) || builtin.chat_model || '';
+    var provider = (shown && shown.name) || builtin.chat_name || (envChat ? '环境变量模型服务' : '');
     setText('chatModelName', model || provider || '未配置模型');
     setText('chatModelMeta', provider ? provider + ' · 统一配置' : '在设置中添加模型服务');
     updateChatComposerMeta();
@@ -936,7 +1244,7 @@
     state.currentTaskTitle = title;
     state.currentTaskLabel = title;
     setText('resultTitle', title + ' 已准备好');
-    setText('resultSubtitle', '章节、知识点与导学已经整理完毕。下一步可以直接进入导图，或让 AI 陪你复习。');
+    setText('resultSubtitle', '章节、知识点与原文覆盖报告已经整理完毕。建议先查看质量结论，再打开导图。');
     var metrics = $('resultMetrics');
     if (metrics) {
       metrics.innerHTML = resultMetric(formatNumber(modules), '模块')
@@ -1003,7 +1311,7 @@
       + '<div class="report-gauge-ring"><svg viewBox="0 0 56 56" role="img" aria-label="原文覆盖率 ' + coverage.toFixed(1) + '%">'
       + '<circle class="gauge-track" cx="28" cy="28" r="' + radius + '"></circle>'
       + '<circle class="gauge-value" cx="28" cy="28" r="' + radius + '" style="stroke-dasharray:' + circumference.toFixed(2) + ';stroke-dashoffset:' + offset.toFixed(2) + '"></circle>'
-      + '<text x="28" y="29" text-anchor="middle">' + coverage.toFixed(1) + '%</text></svg><span>原文覆盖</span></div>'
+      + '<text x="28" y="29" text-anchor="middle">' + coverage.toFixed(1) + '%</text></svg><span>原文知识覆盖</span></div>'
       + '<div class="report-kv">'
       + rows.map(function (r) { return '<span>' + esc(r[0]) + ' <b>' + esc(r[1]) + '</b></span>'; }).join('')
       + '<span>原文 <b>' + esc(source.paragraphs || 0) + '</b> 段 / <b>' + esc(source.headings || 0) + '</b> 个标题</span>'
@@ -1135,6 +1443,16 @@
       + (note ? '<em>' + esc(note) + '</em>' : '') + '</div>';
   }
 
+  function rmCountPair(matched, total) {
+    if (matched === null || matched === undefined || total === null || total === undefined) return '—';
+    return formatNumber(matched) + ' / ' + formatNumber(total);
+  }
+
+  function rmEvidence(value, label, note) {
+    return '<div class="rm-evidence-item"><strong>' + esc(value) + '</strong><span>' + esc(label) + '</span>'
+      + (note ? '<small>' + esc(note) + '</small>' : '') + '</div>';
+  }
+
   function buildResultModalHtml(report, tree) {
     var n = (report && report.nodes) || {};
     var f = report && report.fidelity;
@@ -1155,17 +1473,37 @@
     var levelLabel = levelLabels[level] || levelLabels.none;
     var levelClass = levelClasses[level] || levelClasses.none;
     var copy = !hasFidelity
-      ? '本次没有生成保真报告，以下按知识树基础统计展示。'
+      ? '本次没有生成原文对照报告，以下只展示知识树基础统计。'
       : level === 'high'
-        ? '原文、结构与顺序保持一致，可以放心使用。'
+        ? '可直接使用：原文内容、标题顺序与结构层级均通过一致性检查。'
         : level === 'medium'
-          ? '大部分内容已保留，建议查看未匹配段落与结构细节。'
-          : '检测到覆盖或结构缺口，建议查看完整报告后再使用。';
+          ? '建议抽查后使用：主体知识已保留，但仍有少量覆盖或结构缺口。'
+          : '建议复核后使用：检测到明显的原文覆盖或结构缺口，请先查看完整报告。';
+
+    var sourceInfo = (f && f.source) || {};
+    var coverageCounts = (f && f.coverage_counts) || {};
+    var paraCount = coverageCounts.paragraphs || {};
+    var charCount = coverageCounts.chars || {};
+    var headCount = coverageCounts.headings || {};
+    var paraTotal = paraCount.total != null ? Number(paraCount.total) : (Number(sourceInfo.paragraphs) || 0);
+    var paraMatched = paraCount.matched != null
+      ? Number(paraCount.matched)
+      : (hasFidelity ? Math.round(paraTotal * (Number(f.paragraph_recall) || 0)) : 0);
+    var charTotal = charCount.total != null ? Number(charCount.total) : (Number(sourceInfo.chars) || 0);
+    var charMatched = charCount.matched != null
+      ? Number(charCount.matched)
+      : (hasFidelity ? Math.round(charTotal * (Number(f.char_coverage) || 0)) : 0);
+    var headTotal = headCount.total != null ? Number(headCount.total) : (Number(sourceInfo.headings) || 0);
+    var headMatched = headCount.matched != null
+      ? Number(headCount.matched)
+      : (hasFidelity ? Math.round(headTotal * (Number(f.heading_recall) || 0)) : 0);
+    var missingParas = Math.max(0, paraTotal - paraMatched);
+    var missingHeadings = Math.max(0, headTotal - headMatched);
 
     var radius = 38;
     var circumference = 2 * Math.PI * radius;
     var offset = circumference * (1 - (pct == null ? 0 : pct) / 100);
-    var ringLabel = hasFidelity ? '原文覆盖' : 'AI 解读覆盖';
+    var ringLabel = hasFidelity ? '原文知识覆盖' : 'AI 解读覆盖';
     var ring = '<div class="rm-ring"><svg viewBox="0 0 92 92" role="img" aria-label="'
       + esc(ringLabel) + ' ' + (pct == null ? '—' : pct.toFixed(1) + '%') + '">'
       + '<circle class="rm-ring-track" cx="46" cy="46" r="' + radius + '"></circle>'
@@ -1173,6 +1511,22 @@
       + circumference.toFixed(2) + ';stroke-dashoffset:' + offset.toFixed(2) + '"></circle>'
       + '<text x="46" y="50" text-anchor="middle">' + (pct == null ? '—' : pct.toFixed(1) + '%') + '</text></svg>'
       + '<span>' + esc(ringLabel) + '</span></div>';
+
+    var qualityEvidence = hasFidelity
+      ? '<section class="rm-quality-evidence" aria-label="本次解析质量证据">'
+        + '<div class="rm-evidence-head"><div><span class="section-kicker">QUALITY EVIDENCE</span>'
+        + '<h3>原文 → 知识树，覆盖是否可信</h3></div><span class="rm-evidence-flow">逐段 / 逐字核验</span></div>'
+        + '<div class="rm-evidence-grid">'
+        + rmEvidence(rmCountPair(paraMatched, paraTotal), '原文段落进入导图', '段落召回 ' + rmPct(f.paragraph_recall))
+        + rmEvidence(rmPct(f.char_coverage), '字符知识覆盖', rmCountPair(charMatched, charTotal) + ' 字')
+        + rmEvidence(rmCountPair(headMatched, headTotal), '原文标题保留', '标题召回 ' + rmPct(f.heading_recall))
+        + rmEvidence(rmPct(f.order_score), '内容顺序保真', '知识点出现顺序')
+        + rmEvidence(rmPct(f.hierarchy_consistency), '结构层级一致', '章节层级规则')
+        + '</div>'
+        + '<p class="rm-method-note"><b>判读口径</b>“原文知识覆盖”按原文段落与字符能否在知识树正文中追溯计算；'
+        + '「AI 解读覆盖」只表示摘要、关键词等增强内容的生成范围，不能替代原文覆盖。</p>'
+        + '</section>'
+      : '';
 
     var kpis = '<div class="rm-kpis">'
       + rmKpi(n.modules != null ? formatNumber(n.modules) : '—', '模块', '章节分组')
@@ -1184,7 +1538,7 @@
       + '</div>';
 
     var fidelityCard = '<section class="rm-card">'
-      + '<div class="rm-card-head"><h4>原文保真</h4><span class="rm-badge ' + levelClass + '">'
+      + '<div class="rm-card-head"><h4>原文覆盖与保真</h4><span class="rm-badge ' + levelClass + '">'
       + esc(levelLabel) + '</span></div>'
       + (hasFidelity
         ? '<div class="rm-metrics">'
@@ -1196,9 +1550,11 @@
           + rmMetric('AI 接地（诊断）', rmPct(f.ai_grounding && f.ai_grounding.summary ? f.ai_grounding.summary.rate : null),
             f.ai_grounding && f.ai_grounding.summary ? f.ai_grounding.summary.rate : null)
           + '</div>'
-          + '<p class="rm-note">原文 <b>' + esc((f.source || {}).paragraphs || 0) + '</b> 段 / <b>'
-          + esc((f.source || {}).headings || 0) + '</b> 个标题'
-          + ((f.lost_paragraphs || []).length ? ' · 未匹配 <b>' + esc(f.lost_paragraphs.length) + '</b> 段' : '')
+          + '<p class="rm-note">原文 <b>' + esc(formatNumber(paraTotal)) + '</b> 段 / <b>'
+          + esc(formatNumber(headTotal)) + '</b> 个标题 · 已保留 <b>'
+          + esc(formatNumber(paraMatched)) + '</b> 段'
+          + (missingParas ? ' · 未匹配 <b>' + esc(formatNumber(missingParas)) + '</b> 段' : '')
+          + (missingHeadings ? ' · 标题未命中 <b>' + esc(formatNumber(missingHeadings)) + '</b> 个' : '')
           + '</p>'
         : '<p class="rm-empty">这份任务还没有保真报告。重新解析后会生成段落、字符、标题与顺序指标。</p>')
       + '</section>';
@@ -1258,9 +1614,10 @@
     return '<div class="rm-summary">'
       + '<div class="rm-score">' + ring
       + '<div class="rm-score-copy"><span class="rm-badge ' + levelClass + '">' + esc(levelLabel) + '</span>'
-      + '<strong>' + (hasFidelity ? '原文覆盖 ' + rmPct(f.char_coverage) : '知识树基础统计') + '</strong>'
+      + '<strong>' + (hasFidelity ? '原文知识覆盖 ' + rmPct(f.char_coverage) : '知识树基础统计') + '</strong>'
       + '<p>' + esc(copy) + '</p></div></div>'
       + kpis + '</div>'
+      + qualityEvidence
       + '<div class="rm-grid">' + fidelityCard + numberingCard + skeletonCard + fileCard + '</div>'
       + details;
   }
@@ -1276,7 +1633,7 @@
       ? tree.title
       : (state.currentTaskTitle || state.currentTaskLabel || '这份资料');
     setText('resultModalTitle', title + ' 解析完成');
-    setText('resultModalSubtitle', '原文保真、编号体系与骨架质量已汇总。');
+    setText('resultModalSubtitle', '原文知识覆盖、结构保真与 AI 解读范围已汇总，可用于判断导图是否值得直接使用。');
     var body = $('resultModalBody');
     if (body) body.innerHTML = buildResultModalHtml(report, tree);
     resultModalState.previousFocus = document.activeElement;
@@ -2873,6 +3230,7 @@
 
   /* ── Settings drawer ─────────────────────────────────────────── */
   function openSettings() {
+    if (apiGuideState.open) closeApiGuide({ restoreFocus: false });
     if (state.commandOpen) closeCommandPalette();
     if (state.docPopoverOpen) closeDocPopover();
     var drawer = $('settingsDrawer');
@@ -3007,6 +3365,35 @@
     if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
     var backdrop = $('drawerBackdrop');
     if (backdrop) backdrop.addEventListener('click', closeSettings);
+
+    // First-run API guide
+    var apiGuideForm = $('apiGuideForm');
+    if (apiGuideForm) apiGuideForm.addEventListener('submit', saveApiGuide);
+    var apiGuidePreset = $('apiGuidePreset');
+    if (apiGuidePreset) apiGuidePreset.addEventListener('change', applyApiGuidePreset);
+    var apiGuideKeyToggle = $('apiGuideKeyToggle');
+    if (apiGuideKeyToggle) apiGuideKeyToggle.addEventListener('click', function () {
+      toggleApiGuideSecret('apiGuideKey', 'apiGuideKeyToggle', 'API Key');
+    });
+    var apiGuideMineruToggle = $('apiGuideMineruToggle');
+    if (apiGuideMineruToggle) apiGuideMineruToggle.addEventListener('click', function () {
+      toggleApiGuideSecret('apiGuideMineru', 'apiGuideMineruToggle', 'MinerU Token');
+    });
+    ['apiGuideName', 'apiGuideBaseUrl', 'apiGuideModel', 'apiGuideKey'].forEach(function (id) {
+      var field = $(id);
+      if (field) field.addEventListener('input', hideApiGuideStatus);
+    });
+    var apiGuideClose = $('apiGuideClose');
+    if (apiGuideClose) apiGuideClose.addEventListener('click', function () { closeApiGuide(); });
+    var apiGuideLater = $('apiGuideLaterBtn');
+    if (apiGuideLater) apiGuideLater.addEventListener('click', function () { closeApiGuide(); });
+    var apiGuideBackdrop = $('apiGuideBackdrop');
+    if (apiGuideBackdrop) apiGuideBackdrop.addEventListener('click', function () { closeApiGuide(); });
+    var apiGuideAdvanced = $('apiGuideAdvancedBtn');
+    if (apiGuideAdvanced) apiGuideAdvanced.addEventListener('click', function () {
+      closeApiGuide({ restoreFocus: false });
+      openSettings();
+    });
 
     var docContext = $('docContextBtn');
     if (docContext) {
@@ -3382,6 +3769,15 @@
     });
 
     document.addEventListener('keydown', function (event) {
+      if (apiGuideState.open) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeApiGuide();
+        } else if (event.key === 'Tab') {
+          trapApiGuideFocus(event);
+        }
+        return;
+      }
       var modifier = event.metaKey || event.ctrlKey;
       if (modifier && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -3431,6 +3827,7 @@
       try { state.activeFile = localStorage.getItem(ACTIVE_FILE_KEY) || ''; } catch (err) {}
     }
     state.chatPrefs = loadChatPrefs();
+    try { state.apiGuideSeen = localStorage.getItem(API_GUIDE_SEEN_KEY) === '1'; } catch (err) {}
     try {
       var savedLibraryOrder = JSON.parse(localStorage.getItem(LIBRARY_ORDER_KEY) || '[]');
       state.libraryOrder = Array.isArray(savedLibraryOrder) ? savedLibraryOrder : [];

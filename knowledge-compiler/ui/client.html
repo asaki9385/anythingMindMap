@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-<link rel="stylesheet" href="client.css?v=22">
+<link rel="stylesheet" href="client.css?v=24">
 </head>
 <body data-scene="home">
 <a class="skip-link" href="#sceneRoot">跳到主要内容</a>
@@ -181,7 +181,7 @@
             <section class="panel parse-result" id="parseResult" hidden aria-live="polite">
               <div class="result-hero">
                 <span class="result-check"><span data-icon="check"></span></span>
-                <div><span class="section-kicker">ANALYSIS COMPLETE</span><h2 id="resultTitle">知识树已生成</h2><p id="resultSubtitle">章节、知识点与导学已经准备好。</p></div>
+                <div><span class="section-kicker">QUALITY REPORT</span><h2 id="resultTitle">知识树已生成</h2><p id="resultSubtitle">章节、知识点与原文覆盖报告已经准备好。</p></div>
               </div>
               <div class="result-metrics" id="resultMetrics"></div>
               <div class="result-report" id="resultReport"></div>
@@ -558,18 +558,113 @@
   <div class="drawer-body"><iframe id="settingsFrame" title="统一设置"></iframe></div>
 </aside>
 
+<div class="api-guide-backdrop" id="apiGuideBackdrop" hidden></div>
+<section class="api-guide-modal" id="apiGuideModal" data-cds="Dialog" role="dialog" aria-modal="true" aria-labelledby="apiGuideTitle" aria-describedby="apiGuideSubtitle" hidden>
+  <header class="api-guide-head">
+    <div class="api-guide-head-copy">
+      <span class="api-guide-mark" data-icon="spark" aria-hidden="true"></span>
+      <div>
+        <span class="section-kicker">FIRST-RUN SETUP</span>
+        <h2 id="apiGuideTitle">连接 AI，开始第一次解析</h2>
+        <p id="apiGuideSubtitle">首次解析前建议先连接模型 API。密钥只保存在本机，之后可随时在解析设置中修改。</p>
+      </div>
+    </div>
+    <button class="icon-btn compact" type="button" id="apiGuideClose" aria-label="关闭 API 配置引导"><span data-icon="close"></span></button>
+  </header>
+  <form class="api-guide-form" id="apiGuideForm" novalidate>
+    <div class="api-guide-body">
+      <aside class="api-guide-intro">
+        <div class="api-guide-route" aria-hidden="true">
+          <span class="api-guide-route-node is-active"><span data-icon="cpu"></span><b>模型 API</b></span>
+          <i></i>
+          <span class="api-guide-route-node"><span data-icon="spark"></span><b>AI 解读</b></span>
+          <i></i>
+          <span class="api-guide-route-node"><span data-icon="tree"></span><b>知识树</b></span>
+        </div>
+        <div class="api-guide-intro-copy">
+          <span class="section-kicker">WHAT YOU NEED</span>
+          <h3>一条 OpenAI 兼容的 API Key</h3>
+          <p>选择常用服务商，或填写任意兼容端点。配置完成后，摘要、考点、导学和对话会使用同一套模型服务。</p>
+        </div>
+        <ul class="api-guide-benefits">
+          <li><span>01</span><div><strong>选择服务</strong><small>预设或自定义 Base URL</small></div></li>
+          <li><span>02</span><div><strong>填入密钥</strong><small>保存后仅脱敏回显</small></div></li>
+          <li><span>03</span><div><strong>开始解析</strong><small>无需离开当前页面</small></div></li>
+        </ul>
+        <div class="api-guide-note"><span data-icon="eyeOff" aria-hidden="true"></span><p>密钥不会显示在页面中。也可以暂时跳过，继续使用离线解析；AI 摘要与考点评分会降级。</p></div>
+      </aside>
+      <div class="api-guide-fields">
+        <div class="api-guide-field-row">
+          <label class="api-guide-field" for="apiGuidePreset">
+            <span>服务商预设</span>
+            <span class="api-guide-select-wrap">
+              <select id="apiGuidePreset" autocomplete="off"></select>
+              <span class="api-guide-select-caret" data-icon="chevronDown" aria-hidden="true"></span>
+            </span>
+          </label>
+          <label class="api-guide-field" for="apiGuideName">
+            <span>连接名称</span>
+            <input id="apiGuideName" type="text" maxlength="60" placeholder="例如：DeepSeek" autocomplete="off">
+          </label>
+        </div>
+        <label class="api-guide-field" for="apiGuideBaseUrl">
+          <span>Base URL</span>
+          <input id="apiGuideBaseUrl" type="url" inputmode="url" placeholder="https://api.deepseek.com" autocomplete="off" spellcheck="false">
+          <small>填写 <code>/v1</code> 或完整的 <code>/chat/completions</code> 地址均可，服务端会自动补全。</small>
+        </label>
+        <label class="api-guide-field" for="apiGuideModel">
+          <span>模型名</span>
+          <input id="apiGuideModel" type="text" placeholder="例如：deepseek-v4-flash" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="api-guide-field" for="apiGuideKey">
+          <span>API Key</span>
+          <span class="api-guide-secret">
+            <input id="apiGuideKey" type="password" placeholder="sk-…" autocomplete="new-password" spellcheck="false" required>
+            <button type="button" id="apiGuideKeyToggle" aria-label="显示 API Key">显示</button>
+          </span>
+          <small>密钥写入本机 <code>data/settings.json</code>，不会回传到页面。</small>
+        </label>
+        <details class="api-guide-optional">
+          <summary>
+            <span class="api-guide-optional-title"><span data-icon="scan" aria-hidden="true"></span><span><strong>MinerU Token</strong><small>扫描版 PDF 可选</small></span></span>
+            <span class="api-guide-optional-state" id="apiGuideMineruState">未配置</span>
+            <span class="api-guide-caret" data-icon="chevronDown" aria-hidden="true"></span>
+          </summary>
+          <div class="api-guide-optional-body">
+            <label class="api-guide-field" for="apiGuideMineru">
+              <span>Token</span>
+              <span class="api-guide-secret">
+                <input id="apiGuideMineru" type="password" placeholder="粘贴 MinerU Token" autocomplete="new-password" spellcheck="false">
+                <button type="button" id="apiGuideMineruToggle" aria-label="显示 MinerU Token">显示</button>
+              </span>
+              <small>不上传也不影响文字型 PDF、Word 与 TXT；扫描件识别效果会降低。</small>
+            </label>
+          </div>
+        </details>
+        <div class="api-guide-status" id="apiGuideStatus" role="alert" hidden></div>
+      </div>
+    </div>
+    <footer class="api-guide-foot">
+      <span class="api-guide-foot-note"><span data-icon="eyeOff" aria-hidden="true"></span>仅保存在本机</span>
+      <button class="btn btn-ghost" type="button" id="apiGuideLaterBtn">稍后填写</button>
+      <button class="btn btn-soft" type="button" id="apiGuideAdvancedBtn"><span data-icon="settings"></span>完整设置</button>
+      <button class="btn btn-primary" type="submit" id="apiGuideSaveBtn"><span data-icon="arrowRight"></span><span id="apiGuideSaveText">保存并继续</span></button>
+    </footer>
+  </form>
+</section>
+
 <div class="result-modal-backdrop" id="resultModalBackdrop" hidden></div>
 <section class="result-modal" id="resultModal" data-cds="Dialog" role="dialog" aria-modal="true" aria-labelledby="resultModalTitle" aria-describedby="resultModalSubtitle" hidden>
   <header class="result-modal-head">
     <div class="result-modal-hero">
       <span class="result-check"><span data-icon="check"></span></span>
       <div>
-        <span class="section-kicker">ANALYSIS COMPLETE</span>
+        <span class="section-kicker">QUALITY REPORT</span>
         <h2 id="resultModalTitle">解析完成</h2>
-        <p id="resultModalSubtitle">原文保真、编号体系与骨架质量已汇总。</p>
+        <p id="resultModalSubtitle">原文知识覆盖、结构保真与 AI 解读范围已汇总，可用于判断导图是否值得直接使用。</p>
       </div>
     </div>
-    <button class="icon-btn compact" type="button" id="resultModalClose" aria-label="关闭解析报告"><span data-icon="close"></span></button>
+    <button class="icon-btn compact" type="button" id="resultModalClose" aria-label="关闭解析质量报告"><span data-icon="close"></span></button>
   </header>
   <div class="result-modal-body" id="resultModalBody"></div>
   <footer class="result-modal-actions">
@@ -584,6 +679,6 @@
 
 <script src="common.js?v=8"></script>
 <script src="review_widget.js?v=30"></script>
-<script src="client.js?v=18"></script>
+<script src="client.js?v=20"></script>
 </body>
 </html>

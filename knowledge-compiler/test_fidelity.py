@@ -67,6 +67,13 @@ def test_clean():
     check(r["char_coverage"] == 1.0, "字符覆盖 100%", r["char_coverage"])
     check(r["heading_recall"] == 1.0, "标题召回 100%", r["heading_recall"])
     check(r["order_score"] == 1.0, "顺序保真 100%", r["order_score"])
+    counts = r["coverage_counts"]
+    check(counts["paragraphs"]["matched"] == counts["paragraphs"]["total"],
+          "段落命中计数完整", counts["paragraphs"])
+    check(counts["chars"]["matched"] == counts["chars"]["total"],
+          "字符命中计数完整", counts["chars"])
+    check(counts["headings"]["matched"] == counts["headings"]["total"],
+          "标题命中计数完整", counts["headings"])
     check(r["verdict"]["level"] == "high", "判定 high", r["verdict"])
 
 
@@ -87,6 +94,11 @@ def test_missing():
     target["content"] = ""
     r = F.audit_unit(CLEAN, tree, route="regex")
     check(r["paragraph_recall"] < 1.0, "段落召回下降", r["paragraph_recall"])
+    counts = r["coverage_counts"]
+    check(counts["paragraphs"]["matched"] < counts["paragraphs"]["total"],
+          "段落缺口计数一致", counts["paragraphs"])
+    check(counts["chars"]["matched"] < counts["chars"]["total"],
+          "字符缺口计数一致", counts["chars"])
     lost = " ".join(x["text"] for x in r["lost_paragraphs"])
     check("社会性" in lost or "学校教育" in lost, "丢失段落被列出", lost)
 

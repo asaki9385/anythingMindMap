@@ -43,8 +43,48 @@ vc.on('jsdomError', (error) => {
 let statusCalls = 0;
 let parsedFileAdded = false;
 let favoriteKeys = ['memory.json'];
+const settingsPosts = [];
+const settingsState = {
+  providers: [],
+  active_id: '',
+  subject: { name: '教育学', exam: '333' },
+  mineru: { has_token: false },
+  builtin: { chat: false, chat_name: '', mineru: false },
+  env: {},
+  enhance: { label: '标准' },
+  presets: [{ name: 'DeepSeek', base_url: 'https://api.deepseek.com', model: 'deepseek-v4-flash' }]
+};
 const NEW_TREE = { title: '新资料', children: [{ title: '第一章', level: 1, children: [ { title: '第一节', level: 2, children: [] }, { title: '第二节', level: 2, children: [] } ] }] };
 const PREVIEW_TREE = { title: '学习科学导论', children: [{ title: '第一章 记忆与注意', level: 1, children: [{ title: '第一节 工作记忆', level: 2, children: [] }] }, { title: '第二章 练习与迁移', level: 1, children: [{ title: '第一节 提取练习', level: 2, children: [] }] }] };
+const RESULT_REPORT = {
+  nodes: { total: 352, modules: 18, exam_points: 72, enhanced: 300, coverage_pct: 85.2, max_depth: 4, levels: {} },
+  tokens: { total_tokens: 234, prompt_tokens: 120, completion_tokens: 114 },
+  files: { count: 1, pages: 24 },
+  duration_sec: 12,
+  ai: { model: 'deepseek-v4-flash', scope_label: '标准（L1–L3）' },
+  numbering: {
+    effective: true, order: ['chapter_cn', 'section_cn'], confidence: 0.94,
+    families: { chapter_cn: { count: 18 }, section_cn: { count: 102 } },
+    restarts: 0, unknown: []
+  },
+  skeleton_quality: {
+    avg_score: 0.968, units: 12, windows: 2, degraded: 0, ungrounded_titles: 0,
+    route_counts: { regex: 12 }
+  },
+  fidelity: {
+    char_coverage: 0.997, paragraph_recall: 0.9972, heading_recall: 0.9894,
+    heading_precision: 0.97, order_score: 1, hierarchy_consistency: 1,
+    source: { paragraphs: 356, chars: 98542, headings: 189, excluded: {} },
+    coverage_counts: {
+      paragraphs: { matched: 355, total: 356 },
+      chars: { matched: 98246, total: 98542 },
+      headings: { matched: 187, total: 189 }
+    },
+    lost_paragraphs: [{ text: '这是一段未匹配原文示例' }],
+    verdict: { level: 'high', reasons: [] },
+    ai_grounding: { summary: { rate: 0.96 } }
+  }
+};
 
 const FILES = [
   {
@@ -86,7 +126,7 @@ win.fetch = async (url, options) => {
   else if (target.includes('/api/status/new1')) { statusCalls++; data = statusCalls < 2 ? { status: 'processing', stage: 'building_tree', progress: 55, messages: ['正在构建章节'] } : { status: 'done', stage: 'complete', progress: 100, messages: ['完成'] }; }
   else if (target.includes('/api/file/task_demo001')) data = PREVIEW_TREE;
   else if (target.includes('/api/result/new1')) { parsedFileAdded = true; data = NEW_TREE; }
-  else if (target.includes('/api/report/new1')) data = { nodes: { total: 4, modules: 1, exam_points: 2, enhanced: 2, coverage_pct: 50 }, tokens: { total_tokens: 234 }, files: { count: 1 }, duration_sec: 12 };
+  else if (target.includes('/api/report/new1')) data = RESULT_REPORT;
   else if (target.includes('/api/stats')) data = { tree_count: 2, node_count: 170 };
   else if (target.includes('/api/files')) data = { files: parsedFileAdded ? FILES.concat([{ filename: 'task_new1', task_id: 'new1', source: 'task', size: 100, modified: new Date().toISOString(), original_files: ['demo.txt'], node_count: 4 }]) : FILES };
   else if (target.includes('/api/tasks')) data = { tasks: [{ task_id: 'run002', filename: '认知负荷.txt', status: 'processing', modified: new Date().toISOString() }] };
@@ -101,9 +141,28 @@ win.fetch = async (url, options) => {
     }
     data = { keys: favoriteKeys.slice() };
   }
-  else if (target.includes('/api/settings')) data = { providers: [], active_id: '', subject: { name: '教育学', exam: '333' }, mineru: { has_token: false }, builtin: { chat: false, chat_name: '', mineru: false }, env: {}, enhance: { label: '标准' } };
+  else if (target.includes('/api/settings')) {
+    if (options && options.method === 'POST') {
+      const body = JSON.parse(options.body || '{}');
+      settingsPosts.push(body);
+      if (body.op === 'upsert_provider') {
+        const provider = body.provider || {};
+        settingsState.providers = [{
+          id: 'srv_guide', active: true, has_key: !!provider.api_key,
+          name: provider.name, base_url: provider.base_url, model: provider.model,
+          key_masked: provider.api_key ? 'sk-gui****test' : ''
+        }];
+        settingsState.active_id = 'srv_guide';
+      } else if (body.op === 'set_general' && body.mineru_token) {
+        settingsState.mineru = { has_token: true, token_masked: 'min-****test' };
+      }
+      data = { ok: true, id: 'srv_guide', settings: settingsState };
+    } else {
+      data = settingsState;
+    }
+  }
   else data = {};
-  return { ok: true, status: 200, json: async () => data };
+  return { ok: true, status: 200, json: async () => data, text: async () => JSON.stringify(data) };
 };
 
 const mounted = [];
@@ -166,6 +225,41 @@ doc.dispatchEvent(new win.Event('DOMContentLoaded'));
   check('解析页不再显示本次覆盖区域', !doc.getElementById('parseOverride') && !doc.getElementById('deepseekKey'));
   check('解析页不再宣传 50MB 单文件限制',
     !doc.querySelector('[data-scene-view="parse"]').textContent.includes('50MB'));
+
+  console.log('[B1] 首次 API 配置引导');
+  await tick(120);
+  const apiGuide = doc.getElementById('apiGuideModal');
+  check('首次进入解析页自动打开 API 配置引导',
+    apiGuide.hidden === false && apiGuide.classList.contains('is-open'));
+  check('引导包含模型与 MinerU 配置字段',
+    !!doc.getElementById('apiGuideBaseUrl') && !!doc.getElementById('apiGuideModel')
+      && !!doc.getElementById('apiGuideKey') && !!doc.getElementById('apiGuideMineru'));
+  check('API Key 默认以密码形式隐藏', doc.getElementById('apiGuideKey').type === 'password');
+  check('默认服务商预设已填入 DeepSeek',
+    doc.getElementById('apiGuideName').value === 'DeepSeek'
+      && doc.getElementById('apiGuideBaseUrl').value === 'https://api.deepseek.com'
+      && doc.getElementById('apiGuideModel').value === 'deepseek-v4-flash');
+  check('引导打开后写入一次性标记', win.localStorage.getItem('kt-api-guide-seen-v1') === '1');
+  doc.getElementById('apiGuideKey').value = 'sk-guide-test';
+  doc.getElementById('apiGuideMineru').value = 'mineru-guide-test';
+  doc.getElementById('apiGuideForm').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  await tick(180);
+  check('引导可直接保存模型与 MinerU 配置',
+    settingsPosts.length === 2
+      && settingsPosts[0].op === 'upsert_provider'
+      && settingsPosts[0].provider.api_key === 'sk-guide-test'
+      && settingsPosts[1].op === 'set_general'
+      && settingsPosts[1].mineru_token === 'mineru-guide-test');
+  check('保存后配置摘要立即刷新',
+    doc.getElementById('parseConfigText').textContent.includes('模型服务：DeepSeek')
+      && doc.getElementById('parseConfigText').textContent.includes('MinerU 已连接'));
+  await tick(220);
+  check('保存后自动关闭 API 引导', apiGuide.hidden === true);
+  win.KTClient.navigate('library');
+  await tick(80);
+  win.KTClient.navigate('parse');
+  await tick(120);
+  check('后续进入解析页不会重复弹出引导', apiGuide.hidden === true);
 
   win.KTClient.navigate('library');
   await tick(160);
@@ -440,10 +534,26 @@ doc.dispatchEvent(new win.Event('DOMContentLoaded'));
   check('提交后显示解析进度', doc.getElementById('parseProgress').hidden === false && doc.getElementById('progressPercent').textContent === '55%');
   await tick(1700);
   check('解析完成后显示结果面板', doc.getElementById('parseResult').hidden === false);
-  check('结果统计为本轮知识树', doc.getElementById('resultMetrics').textContent.includes('4') && doc.getElementById('resultMetrics').textContent.includes('知识点'));
+  check('结果统计为本轮知识树', doc.getElementById('resultMetrics').textContent.includes('352') && doc.getElementById('resultMetrics').textContent.includes('知识点'));
   check('解析完成自动设为当前资料', win.KTClient.getState().activeFile === 'task_new1');
   check('处理细节以折叠面板呈现', !!doc.querySelector('#resultReport details.report-accordion') && doc.getElementById('resultReport').textContent.includes('处理细节'));
   check('Token 仪表与覆盖率渲染', !!doc.querySelector('#resultReport .report-gauge-ring') && doc.getElementById('resultReport').textContent.includes('合计'));
+  check('解析完成后自动打开质量报告浮窗',
+    doc.getElementById('resultModal').hidden === false
+      && doc.getElementById('resultModal').classList.contains('is-open'));
+  check('质量结论突出原文知识覆盖与使用建议',
+    doc.getElementById('resultModalBody').textContent.includes('原文知识覆盖 99.7%')
+      && doc.getElementById('resultModalBody').textContent.includes('可直接使用'));
+  check('质量证据展示段落、字符与标题命中数',
+    doc.getElementById('resultModalBody').textContent.includes('355 / 356')
+      && doc.getElementById('resultModalBody').textContent.includes('98,246 / 98,542 字')
+      && doc.getElementById('resultModalBody').textContent.includes('187 / 189'));
+  check('原文覆盖与 AI 解读覆盖口径分开说明',
+    doc.getElementById('resultModalBody').textContent.includes('AI 解读覆盖')
+      && doc.getElementById('resultModalBody').textContent.includes('不能替代原文覆盖'));
+  doc.getElementById('resultModalLaterBtn').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await tick(300);
+  check('质量报告弹窗可关闭', doc.getElementById('resultModal').hidden === true);
   win.KTClient.navigate('chat');
   await tick(180);
   check('任务型资料显示精确解析用量', doc.getElementById('chatTokenCaption').textContent.includes('解析用量 234 tok'));
