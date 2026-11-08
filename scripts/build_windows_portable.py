@@ -64,10 +64,28 @@ def ignore_runtime_junk(_directory: str, names: list[str]) -> set[str]:
     return ignored
 
 
-def run(command: list[object], cwd: Path | None = None) -> None:
+def run(command: list[object], cwd: Path | None = None, env: dict | None = None) -> None:
     printable = " ".join(str(part) for part in command)
     print(f"+ {printable}", flush=True)
-    subprocess.run([str(part) for part in command], cwd=str(cwd) if cwd else None, check=True)
+    subprocess.run(
+        [str(part) for part in command],
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        check=True,
+    )
+
+
+def remove_bytecode(root: Path) -> None:
+    """Keep staging verification from leaving Python caches in the ZIP."""
+    cache_dirs = sorted(root.rglob("__pycache__"), key=lambda path: len(path.parts), reverse=True)
+    for cache_dir in cache_dirs:
+        shutil.rmtree(cache_dir, ignore_errors=True)
+    for suffix in ("*.pyc", "*.pyo"):
+        for bytecode in root.rglob(suffix):
+            try:
+                bytecode.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def sanitize_app_settings(path: Path) -> None:
@@ -196,6 +214,8 @@ def verify_staged_app(stage: Path, packaged_python: Path | None) -> None:
         return
 
     app_dir = stage / "app"
+    verify_env = os.environ.copy()
+    verify_env["PYTHONDONTWRITEBYTECODE"] = "1"
     run(
         [
             packaged_python,
@@ -203,6 +223,7 @@ def verify_staged_app(stage: Path, packaged_python: Path | None) -> None:
             "import fastapi, uvicorn, pymupdf, httpx, requests, multipart, docx, chardet",
         ],
         cwd=app_dir,
+        env=verify_env,
     )
     run(
         [
@@ -211,8 +232,9 @@ def verify_staged_app(stage: Path, packaged_python: Path | None) -> None:
             "import sys; sys.path.insert(0, 'knowledge-compiler'); import server; print('server import ok')",
         ],
         cwd=app_dir,
+        env=verify_env,
     )
-    run([packaged_python, app_dir / "launcher.py", "--help"], cwd=app_dir)
+    run([packaged_python, app_dir / "launcher.py", "--help"], cwd=app_dir, env=verify_env)
 
 
 def make_zip(stage: Path, zip_path: Path) -> None:
@@ -271,6 +293,10 @@ def main() -> int:
 
     if packaged_python is not None and not args.skip_deps:
         verify_staged_app(stage, packaged_python)
+
+    # Import probes above may create cache files. Never ship machine-specific
+    # bytecode or __pycache__ directories in the portable package.
+    remove_bytecode(stage)
 
     zip_path = output_dir / f"{PACKAGE_DIR_NAME}.zip"
     make_zip(stage, zip_path)
