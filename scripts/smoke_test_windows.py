@@ -61,16 +61,21 @@ def main() -> int:
             fail("start.bat must use CRLF line endings")
 
         forbidden_names = {"settings.json"}
+        app_root = package_root / "app"
         for path in package_root.rglob("*"):
-            if path.name in forbidden_names:
-                fail(f"forbidden runtime data file: {path.relative_to(package_root)}")
-            if path.name.startswith(("test_", "benchmark_", "debug_")):
-                fail(f"development file leaked into package: {path.relative_to(package_root)}")
-            if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}:
-                fail(f"bytecode/cache leaked into package: {path.relative_to(package_root)}")
             relative = str(path.relative_to(package_root))
-            if any(token in relative for token in (".deck-", "_archive", "design-qa.md")):
-                fail(f"non-runtime asset leaked into package: {relative}")
+            if path.name in forbidden_names:
+                fail(f"forbidden runtime data file: {relative}")
+            if path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}:
+                fail(f"bytecode/cache leaked into package: {relative}")
+            # The bundled CPython runtime legitimately ships its own stdlib
+            # tests and debug helpers. Development-file checks apply only to
+            # our application payload.
+            if app_root in path.parents:
+                if path.name.startswith(("test_", "benchmark_", "debug_")):
+                    fail(f"development file leaked into package: {relative}")
+                if any(token in relative for token in (".deck-", "_archive", "design-qa.md")):
+                    fail(f"non-runtime asset leaked into package: {relative}")
 
         settings_text = (package_root / "app" / "knowledge-compiler" / "app_settings.py").read_text(
             encoding="utf-8"
